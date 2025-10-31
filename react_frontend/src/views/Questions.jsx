@@ -22,6 +22,7 @@ export default function Questions() {
   const [submitting, setSubmitting] = useState({}); // { [question_id]: boolean }
   const [submitted, setSubmitted] = useState({}); // { [question_id]: boolean }
   const [counts, setCounts] = useState({}); // { [question_id]: number[] }
+  const [toast, setToast] = useState(null); // { type: 'success' | 'error', text: string }
   const socketRef = useRef(null);
 
   // Fetch questions
@@ -110,6 +111,7 @@ export default function Questions() {
 
   const user = getStoredUser();
 
+  // Ocean Professional cohesive palette for charts
   const COLORS = [
     "var(--chart-palette-1)",
     "var(--chart-palette-2)",
@@ -117,10 +119,19 @@ export default function Questions() {
     "var(--chart-palette-4)",
     "var(--chart-palette-5)",
     "var(--chart-palette-6)",
+    "var(--chart-palette-7)",
+    "var(--chart-palette-8)",
   ];
 
   const handleSelect = (qid, idx) => {
     setSelected((prev) => ({ ...prev, [qid]: idx }));
+  };
+
+  const announce = (type, text) => {
+    setToast({ type, text });
+    // Auto-dismiss after 3 seconds
+    window.clearTimeout(announce._t);
+    announce._t = window.setTimeout(() => setToast(null), 3000);
   };
 
   const handleSubmit = async (qid) => {
@@ -130,6 +141,7 @@ export default function Questions() {
     try {
       await submitAnswer({ question_id: qid, selectedOptionIndex: idx });
       setSubmitted((p) => ({ ...p, [qid]: true }));
+      announce("success", "Your answer has been submitted.");
       // Optimistic update counts; socket will reconcile
       setCounts((prev) => {
         const question = questions.find((q) => (q._id || q.id || q.text) === qid);
@@ -140,8 +152,7 @@ export default function Questions() {
         return { ...prev, [qid]: next };
       });
     } catch (e) {
-      // eslint-disable-next-line no-alert
-      alert(e?.message || "Failed to submit answer");
+      announce("error", e?.message || "Failed to submit answer");
     } finally {
       setSubmitting((p) => ({ ...p, [qid]: false }));
     }
@@ -153,7 +164,13 @@ export default function Questions() {
     const v = Number(n || 0);
     return v.toLocaleString(undefined);
   };
+  const formatPercent = (value, total) => {
+    const t = total || 0;
+    if (!t) return "0%";
+    return `${((value / t) * 100).toFixed(1)}%`;
+  };
 
+  // Accessible, themed Donut
   const Donut = ({ qid, options }) => {
     const data = useMemo(() => {
       const arr = counts[qid] || [];
@@ -165,11 +182,18 @@ export default function Questions() {
     }, [counts[qid], options]);
 
     if (!data || data.length === 0) {
-      return <div className="muted">No responses yet.</div>;
+      return (
+        <div className="empty-state" role="status" aria-live="polite">
+          <span className="empty-icon" aria-hidden="true">ⓘ</span>
+          <span>No responses yet</span>
+        </div>
+      );
     }
 
+    const total = data.reduce((a, b) => a + b.value, 0);
+
     return (
-      <div style={{ width: "100%", height: 240 }} className="chart-gradient">
+      <div className="chart-container chart-gradient" role="img" aria-label="Donut chart of responses">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -177,17 +201,65 @@ export default function Questions() {
               dataKey="value"
               nameKey="name"
               innerRadius={60}
-              outerRadius={90}
+              outerRadius={96}
               paddingAngle={2}
             >
               {data.map((_, idx) => (
-                <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+                <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} stroke="rgba(17,24,39,0.08)" />
               ))}
             </Pie>
-            <Tooltip formatter={(value, name) => [`${numberFmt(value)}`, name]} />
-            <Legend verticalAlign="bottom" height={36} formatter={(value) => <span style={{ color: "var(--chart-legend-text)" }}>{value}</span>} />
+            <Tooltip
+              formatter={(value, name) => [`${numberFmt(value)} (${formatPercent(value, total)})`, name]}
+              labelFormatter={(label) => `Option: ${label}`}
+            />
+            <Legend
+              verticalAlign="bottom"
+              height={40}
+              formatter={(value) => (
+                <span style={{ color: "var(--chart-legend-text)" }} aria-label={`Legend: ${value}`}>
+                  {value}
+                </span>
+              )}
+            />
           </PieChart>
         </ResponsiveContainer>
+      </div>
+    );
+  };
+
+  // OptionCard: keyboard-accessible, hover/active styled option
+  const OptionCard = ({ id, name, idx, label, selectedIdx, onSelect, disabled }) => {
+    const checked = selectedIdx === idx;
+    return (
+      <div
+        className={`option-card ${checked ? "selected" : ""} ${disabled ? "disabled" : ""}`}
+        role="radio"
+        aria-checked={checked}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (disabled) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSelect();
+          }
+        }}
+        onClick={() => {
+          if (!disabled) onSelect();
+        }}
+      >
+        <div className="option-left">
+          <input
+            id={id}
+            type="radio"
+            name={name}
+            checked={checked}
+            onChange={onSelect}
+            aria-labelledby={`${id}-label`}
+          />
+          <span className="option-key">{String.fromCharCode(65 + idx)}.</span>
+          <span id={`${id}-label`} className="option-text">{label}</span>
+        </div>
+        {checked ? <span className="pill pill-click">Chosen</span> : null}
       </div>
     );
   };
@@ -195,77 +267,78 @@ export default function Questions() {
   return (
     <div className="app-container">
       <Header title="Questions" subtitle="Answer MCQs and see live results" />
-      {loading ? <div className="muted">Loading questions…</div> : null}
-      {loadError ? <div className="auth-error" style={{ margin: "12px 0" }}>{String(loadError)}</div> : null}
-      {!loading && questions.length === 0 ? <div className="muted">No questions available.</div> : null}
 
-      <div className="cards">
+      {/* Toast notification */}
+      {toast ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`inline-toast ${toast.type === "error" ? "toast-error" : "toast-success"}`}
+        >
+          {toast.text}
+        </div>
+      ) : null}
+
+      {loading ? <div className="skeleton skeleton-text" aria-busy="true">Loading questions…</div> : null}
+      {loadError ? <div className="auth-error" style={{ margin: "12px 0" }}>{String(loadError)}</div> : null}
+      {!loading && questions.length === 0 ? (
+        <div className="empty-state" role="status" aria-live="polite">
+          <span className="empty-icon" aria-hidden="true">ⓘ</span>
+          <span>No questions available</span>
+        </div>
+      ) : null}
+
+      <section className="dashboard-grid" aria-label="Questions list">
         {questions.map((q) => {
           const qid = getQuestionId(q);
           const chosen = selected[qid];
           const isSubmitting = !!submitting[qid];
           const isSubmitted = !!submitted[qid];
           return (
-            <div className="card" key={qid}>
-              <h3 className="section-title" style={{ marginBottom: 8 }}>{q.text}</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+            <div className="dash-card" key={qid} aria-labelledby={`${qid}-title`}>
+              <h3 id={`${qid}-title`} className="dash-heading">{q.text}</h3>
+              <p className="dash-subheading">Choose one option below</p>
+
+              <div role="radiogroup" aria-label={`Options for question ${q.text}`} className="options-grid">
                 {(q.options || []).map((opt, idx) => {
                   const id = `${qid}-opt-${idx}`;
                   return (
-                    <label
+                    <OptionCard
                       key={id}
-                      htmlFor={id}
-                      className="auth-label"
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 12,
-                        background: "var(--color-surface)",
-                        borderRadius: 10,
-                        padding: "8px 10px",
-                        margin: 0,
-                        boxShadow: "var(--shadow-sm)",
-                        border: chosen === idx ? "1px solid rgba(37,99,235,0.35)" : "1px solid #e5e7eb",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <input
-                          id={id}
-                          type="radio"
-                          name={`q-${qid}`}
-                          checked={chosen === idx}
-                          onChange={() => handleSelect(qid, idx)}
-                        />
-                        <span style={{ fontWeight: 600 }}>{String.fromCharCode(65 + idx)}.</span>
-                        <span>{opt?.text || "-"}</span>
-                      </div>
-                      {isSubmitted ? (
-                        <span className="pill pill-view">Selected</span>
-                      ) : null}
-                    </label>
+                      id={id}
+                      name={`q-${qid}`}
+                      idx={idx}
+                      label={opt?.text || "-"}
+                      selectedIdx={chosen}
+                      onSelect={() => handleSelect(qid, idx)}
+                      disabled={isSubmitted}
+                    />
                   );
                 })}
               </div>
 
-              <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
+              <div className="actions-row">
                 <button
                   className="btn-primary"
                   disabled={typeof chosen !== "number" || isSubmitting || isSubmitted}
                   onClick={() => handleSubmit(qid)}
                   title={user ? `Answer as ${user.username || user.email}` : "Answer"}
+                  aria-busy={isSubmitting ? "true" : "false"}
                 >
                   {isSubmitting ? "Submitting…" : isSubmitted ? "Submitted" : "Submit Answer"}
                 </button>
+                {isSubmitted ? (
+                  <span className="hint muted">Your response was recorded.</span>
+                ) : null}
               </div>
 
-              <div style={{ marginTop: 14 }}>
+              <div style={{ marginTop: 12 }}>
                 <Donut qid={qid} options={q.options} />
               </div>
             </div>
           );
         })}
-      </div>
+      </section>
 
       <footer className="footer">
         <span>Ocean Professional Theme</span>
