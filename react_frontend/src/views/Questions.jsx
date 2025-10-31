@@ -170,7 +170,7 @@ export default function Questions() {
     return `${((value / t) * 100).toFixed(1)}%`;
   };
 
-  // Accessible, themed Donut
+  // Accessible, themed Donut (responsive via .chart-container)
   const Donut = ({ qid, options }) => {
     const data = useMemo(() => {
       const arr = counts[qid] || [];
@@ -236,6 +236,7 @@ export default function Questions() {
         role="radio"
         aria-checked={checked}
         tabIndex={0}
+        aria-disabled={disabled ? "true" : "false"}
         onKeyDown={(e) => {
           if (disabled) return;
           if (e.key === "Enter" || e.key === " ") {
@@ -248,6 +249,7 @@ export default function Questions() {
         }}
       >
         <div className="option-left">
+          {/* Visually hide native input but keep it for a11y and forms */}
           <input
             id={id}
             type="radio"
@@ -255,11 +257,21 @@ export default function Questions() {
             checked={checked}
             onChange={onSelect}
             aria-labelledby={`${id}-label`}
+            style={{ position: "absolute", opacity: 0, width: 1, height: 1, pointerEvents: "none" }}
           />
-          <span className="option-key">{String.fromCharCode(65 + idx)}.</span>
-          <span id={`${id}-label`} className="option-text">{label}</span>
+          <span className="option-key" aria-hidden="true">
+            {String.fromCharCode(65 + idx)}.
+          </span>
+          <span id={`${id}-label`} className="option-text">
+            {label}
+          </span>
         </div>
-        {checked ? <span className="pill pill-click">Chosen</span> : null}
+        <span
+          className={`pill ${checked ? "pill-click" : ""}`}
+          aria-hidden={checked ? "false" : "true"}
+        >
+          {checked ? "Selected" : "Choose"}
+        </span>
       </div>
     );
   };
@@ -299,7 +311,11 @@ export default function Questions() {
               <h3 id={`${qid}-title`} className="dash-heading">{q.text}</h3>
               <p className="dash-subheading">Choose one option below</p>
 
-              <div role="radiogroup" aria-label={`Options for question ${q.text}`} className="options-grid">
+              <div
+                role="radiogroup"
+                aria-label={`Options for question ${q.text}`}
+                className="options-grid"
+              >
                 {(q.options || []).map((opt, idx) => {
                   const id = `${qid}-opt-${idx}`;
                   return (

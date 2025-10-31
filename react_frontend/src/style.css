@@ -582,11 +582,11 @@ body {
 .options-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: var(--space-3);
 }
 @media (min-width: 680px) {
   .options-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr; /* 2 columns on md+ for 2x2 layout */
   }
 }
 
@@ -597,16 +597,23 @@ body {
   gap: 12px;
   background: var(--color-surface);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 14px 14px;
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
   transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition), background var(--transition);
   cursor: pointer;
+
+  /* Consistent heights across cards in a row */
+  min-height: 72px;
 }
 .option-card:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
   background: linear-gradient(135deg, rgba(37,99,235,0.05), rgba(255,255,255,1));
+}
+.option-card:active {
+  transform: translateY(0);
+  opacity: 0.98;
 }
 .option-card:focus {
   outline: none;
@@ -618,6 +625,7 @@ body {
 .option-card.selected {
   border-color: rgba(37,99,235,0.45);
   background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(255,255,255,1));
+  box-shadow: 0 10px 18px rgba(37,99,235,0.14);
 }
 .option-card.disabled {
   opacity: 0.75;
@@ -634,7 +642,9 @@ body {
 }
 .option-text {
   color: #111827;
+  line-height: 1.3;
 }
+
 
 /* Small action row hint */
 .actions-row {
