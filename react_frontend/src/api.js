@@ -194,10 +194,12 @@ export async function getEventTypeDistribution() {
  * PUBLIC_INTERFACE
  * getSignupsPerDay
  * Returns array of { date: 'YYYY-MM-DD', count: number }.
+ * Accepts optional range param: '7d' | '14d' | '30d' (backend may ignore; frontend handles gracefully).
  */
-export async function getSignupsPerDay() {
+export async function getSignupsPerDay(range = "") {
   const base = getApiBaseUrl();
-  const url = `${base}/api/metrics/signups-per-day`;
+  const q = range ? `?range=${encodeURIComponent(range)}` : "";
+  const url = `${base}/api/metrics/signups-per-day${q}`;
   const res = await authorizedFetch(url, { method: "GET" });
   if (!res.ok) throw new Error(`getSignupsPerDay failed: ${res.status}`);
   return res.json();

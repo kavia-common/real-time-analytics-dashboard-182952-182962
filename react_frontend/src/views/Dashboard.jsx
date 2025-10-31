@@ -11,6 +11,7 @@ import {
   getUsersAnsweredToday,
   getEventHeatmap,
 } from "../api.js";
+import { numberFmt as nf, dateFmtYMD, dateFmtFull, computeMovingAverage, getMinAvgMax, deltaArrow } from "../utils/format.js";
 import { getStoredUser } from "../auth.js";
 import {
   ResponsiveContainer,
@@ -46,6 +47,8 @@ export default function Dashboard() {
   const [totalEvents, setTotalEvents] = useState(0);
   const [eventTypes, setEventTypes] = useState([]); // [{event_type,count}]
   const [signupsPerDay, setSignupsPerDay] = useState([]); // [{date,count}]
+  const [signupsRange, setSignupsRange] = useState("14d"); // 7d | 14d | 30d
+  const [signupsBreakdown, setSignupsBreakdown] = useState(false); // toggle for optional breakdown, hidden if not available
   const [activeUsers, setActiveUsers] = useState([]); // [{minute,count}]
   const [recentActivity, setRecentActivity] = useState([]); // events array
   const [activeWindow, setActiveWindow] = useState("10m");
@@ -75,7 +78,7 @@ export default function Dashboard() {
       const [total, types, signups, active, recent, usersToday, heatmapData] = await Promise.allSettled([
         getTotalEvents(),
         getEventTypeDistribution(),
-        getSignupsPerDay(),
+        getSignupsPerDay(signupsRange),
         getActiveUsers(activeWindow),
         getRecentActivity(),
         getUsersAnsweredToday(),
@@ -144,7 +147,7 @@ export default function Dashboard() {
   useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeWindow]);
+  }, [activeWindow, signupsRange]);
 
   // Socket for live refresh on metrics updates
   useEffect(() => {
@@ -233,6 +236,31 @@ export default function Dashboard() {
     return arr;
   }, [signupsPerDay]);
 
+  // Derived: 7-day moving average overlay based on count
+  const signupsWithMA = useMemo(() => {
+    const ma = computeMovingAverage(signupsData, (d) => d.count, 7);
+    return signupsData.map((d, i) => ({ ...d, ma: ma[i] != null ? Number(ma[i]) : null }));
+  }, [signupsData]);
+
+  // Stats and deltas
+  const signupsTotal = useMemo(() => signupsData.reduce((a, b) => a + Number(b.count || 0), 0), [signupsData]);
+  const signupsStats = useMemo(() => getMinAvgMax(signupsData, (d) => d.count), [signupsData]);
+  const signupsLatest = useMemo(() => (signupsData.length ? signupsData[signupsData.length - 1].count : 0), [signupsData]);
+  const signupsPrev = useMemo(() => (signupsData.length > 1 ? signupsData[signupsData.length - 2].count : 0), [signupsData]);
+  const signupsDelta = useMemo(() => deltaArrow(signupsLatest, signupsPrev), [signupsLatest, signupsPrev]);
+
+  // Last 7 days table
+  const last7 = useMemo(() => {
+    const arr = [...signupsData];
+    return arr.slice(Math.max(0, arr.length - 7)).map((d, i, sliced) => {
+      const prev = i > 0 ? sliced[i - 1].count : null;
+      return {
+        ...d,
+        delta: prev == null ? null : Number(d.count || 0) - Number(prev || 0),
+      };
+    });
+  }, [signupsData]);
+
   const activeUsersData = useMemo(() => {
     const arr = Array.isArray(activeUsers) ? [...activeUsers] : [];
     arr.sort((a, b) => String(a.minute).localeCompare(String(b.minute)));
@@ -282,10 +310,7 @@ export default function Dashboard() {
     return `${((value / t) * 100).toFixed(1)}%`;
   };
 
-  const numberFmt = (n) => {
-    const v = Number(n || 0);
-    return v.toLocaleString(undefined);
-  };
+  const numberFmt = (n) => nf(n);
 
   const timeFmt = (iso) => {
     try {
@@ -485,10 +510,44 @@ export default function Dashboard() {
       {/* Grid 3: Trends */}
       <section className="dashboard-grid" aria-label="Trend charts">
         <div className="dash-card" aria-label="Daily signups chart">
-          <h3 className="dash-heading">Daily Signups</h3>
-          <p className="dash-subheading">Number of new user accounts created per day</p>
+          <div className="q-head">
+            <div>
+              <h3 className="dash-heading">Daily Signups</h3>
+              <p className="dash-subheading">New user accounts per day with 7-day moving average</p>
+            </div>
+            <div className="q-actions" role="group" aria-label="Signups range">
+              <div className="segmented" title="Select range">
+                {["7d", "14d", "30d"].map((r) => (
+                  <button
+                    key={r}
+                    className={`segmented-btn ${signupsRange === r ? "active" : ""}`}
+                    onClick={() => setSignupsRange(r)}
+                    aria-pressed={signupsRange === r}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* KPI Row */}
+          <div className="control-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div className="kpi-total">{nf(signupsTotal)} total signups</div>
+              <div className={`kpi-sub ${signupsDelta.colorClass}`} title="Day-over-day change">
+                {signupsDelta.arrow} {nf(Math.abs(signupsDelta.delta))} DoD
+              </div>
+            </div>
+            <div className="kpi-badges" aria-label="Min/Avg/Max">
+              <span className="kpi-badge min" title="Minimum per-day in range">Min: {nf(signupsStats.min)}</span>
+              <span className="kpi-badge avg" title="Average per-day in range">Avg: {nf(Math.round(signupsStats.avg))}</span>
+              <span className="kpi-badge max" title="Maximum per-day in range">Max: {nf(signupsStats.max)}</span>
+            </div>
+          </div>
+
           <div className="chart-container chart-gradient">
-            {signupsData.length === 0 ? (
+            {signupsWithMA.length === 0 ? (
               <div className="empty-state" role="status" aria-live="polite">
                 <span className="empty-icon" aria-hidden="true">ⓘ</span>
                 <span>No data yet</span>
@@ -496,23 +555,80 @@ export default function Dashboard() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={signupsData}
+                  data={signupsWithMA}
                   margin={{ top: 10, right: 16, left: 0, bottom: 0 }}
                   role="img"
-                  aria-label="Bar chart showing daily signups"
+                  aria-label="Bar and line chart showing daily signups and 7-day moving average"
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid-stroke)" />
-                  <XAxis dataKey="date" stroke="var(--chart-axis-stroke)" tick={{ fontSize: 12 }} />
-                  <YAxis allowDecimals={false} stroke="var(--chart-axis-stroke)" tick={{ fontSize: 12 }} tickFormatter={numberFmt} />
+                  <XAxis dataKey="date" stroke="var(--chart-axis-stroke)" tick={{ fontSize: 12 }} tickFormatter={dateFmtYMD} />
+                  <YAxis allowDecimals={false} stroke="var(--chart-axis-stroke)" tick={{ fontSize: 12 }} tickFormatter={nf} />
                   <Tooltip
-                    labelFormatter={(label) => `Date: ${label}`}
-                    formatter={(value) => [`${numberFmt(value)} signups`, "Count"]}
+                    labelFormatter={(label) => `Date: ${dateFmtFull(label)}`}
+                    formatter={(value, name, props) => {
+                      const key = props?.dataKey;
+                      if (key === "ma") {
+                        return [`${nf(value)} (7d MA)`, "Moving Avg"];
+                      }
+                      return [`${nf(value)} signups`, "Signups"];
+                    }}
                   />
+                  <Legend formatter={(value) => <span style={{ color: "var(--chart-legend-text)" }}>{value}</span>} />
                   <Bar dataKey="count" name="Signups" fill="var(--chart-palette-1)" radius={[8, 8, 0, 0]} />
+                  <Line
+                    type="monotone"
+                    dataKey="ma"
+                    name="7d MA"
+                    stroke="var(--color-secondary)"
+                    strokeWidth={2}
+                    dot={{ r: 0 }}
+                    activeDot={{ r: 5 }}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             )}
           </div>
+
+          {/* Optional breakdown toggle placeholder (hidden if backend doesn't provide) */}
+          {signupsBreakdown ? (
+            <div className="muted" style={{ marginTop: 8 }}>
+              Breakdown by type is not available from backend. Hiding section.
+            </div>
+          ) : null}
+
+          {/* Last 7 days mini table */}
+          <table className="mini-table" role="table" aria-label="Last 7 days signups">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Count</th>
+                <th>Delta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {last7.map((d) => {
+                const delta = d.delta;
+                const cls = delta == null ? "flat" : delta > 0 ? "up" : delta < 0 ? "down" : "flat";
+                const arrow = delta == null ? "–" : delta > 0 ? "▲" : delta < 0 ? "▼" : "–";
+                return (
+                  <tr key={d.date}>
+                    <td title={dateFmtFull(d.date)}>{dateFmtYMD(d.date)}</td>
+                    <td>{nf(d.count)}</td>
+                    <td>
+                      <span className={`mini-pill ${cls}`}>
+                        {arrow} {delta == null ? "n/a" : nf(Math.abs(delta))}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {last7.length === 0 ? (
+                <tr>
+                  <td colSpan="3" className="muted">No recent days</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
 
         <div className="dash-card" aria-label="Active users timeseries">
