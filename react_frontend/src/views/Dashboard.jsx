@@ -31,9 +31,9 @@ import {
  * Dashboard
  * Metrics dashboard showing:
  * - Total Events (counter)
- * - Event Types (pie/donut)
- * - Signups per Day (bar)
- * - Active Users last 10 min (line)
+ * - Events by Type (pie/donut)
+ * - Daily Signups (bar)
+ * - Active Users (last 10 min) (line, window can change)
  * - Recent Activity (table)
  * Fetches from /api/metrics endpoints and refreshes on Socket.io events:
  * 'metrics_update' and 'user_event_created' (if available).
@@ -51,6 +51,7 @@ export default function Dashboard() {
   const socketRef = useRef(null);
   const user = getStoredUser();
 
+  // Ocean Professional palette
   const COLORS = ["#2563EB", "#F59E0B", "#10B981", "#EF4444", "#8B5CF6", "#06B6D4", "#0EA5E9", "#14B8A6"];
 
   const loadAll = async () => {
@@ -170,7 +171,6 @@ export default function Dashboard() {
   }, [eventTypes]);
 
   const signupsData = useMemo(() => {
-    // Ensure lexicographic date sort
     const arr = Array.isArray(signupsPerDay) ? [...signupsPerDay] : [];
     arr.sort((a, b) => String(a.date).localeCompare(String(b.date)));
     return arr;
@@ -190,42 +190,44 @@ export default function Dashboard() {
       return () => clearTimeout(t);
     }, [total]);
     return (
-      <div className="live-counter">
+      <div className="live-counter" role="status" aria-live="polite" aria-label="Total Events counter">
         <div className={`live-counter-number ${animate ? "bump" : ""}`}>{total}</div>
-        <div className="live-counter-label">Total Events</div>
+        <div className="live-counter-label">Total Events (all time)</div>
       </div>
     );
+  };
+
+  const formatPercent = (value, total) => {
+    const t = total || 0;
+    if (!t) return "0%";
+    return `${((value / t) * 100).toFixed(1)}%`;
   };
 
   return (
     <div className="app-container">
       <Header title="Real-time Analytics Dashboard" subtitle="Live metrics and user activity" />
 
-      {loading ? <div className="muted" style={{ margin: "10px 0" }}>Loading metrics…</div> : null}
+      {loading ? <div className="skeleton skeleton-text" aria-busy="true" aria-live="polite">Loading metrics…</div> : null}
       {Object.keys(errors).length > 0 ? (
-        <div className="auth-error" style={{ margin: "10px 0" }}>
+        <div className="auth-error" style={{ margin: "10px 0" }} role="alert">
           Some metrics failed to load: {Object.values(errors).join(" • ")}
         </div>
       ) : null}
 
-      <section className="cards">
-        <div className="card">
+      <section className="cards dashboard-grid" aria-label="Top metrics">
+        <div className="card" aria-label="Total events and controls">
+          <h3 className="section-title">Total Events (all time)</h3>
+          <p className="section-subtitle">Cumulative number of user-generated events since tracking began</p>
           <TotalCounter total={totalEvents} />
-          <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span className="muted">Active users window:</span>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div className="control-row" role="group" aria-label="Active users time window">
+            <span className="muted">Active users window</span>
+            <div className="segmented">
               {["10m", "30m", "1h"].map((w) => (
                 <button
                   key={w}
-                  className="btn-primary"
-                  style={{
-                    padding: "6px 10px",
-                    borderRadius: 999,
-                    background: activeWindow === w ? "var(--color-primary)" : "rgba(37,99,235,0.10)",
-                    color: activeWindow === w ? "#fff" : "#1d4ed8",
-                    boxShadow: activeWindow === w ? "0 10px 18px rgba(37,99,235,0.18)" : "var(--shadow-sm)",
-                  }}
+                  className={`segmented-btn ${activeWindow === w ? "active" : ""}`}
                   onClick={() => setActiveWindow(w)}
+                  aria-pressed={activeWindow === w}
                 >
                   {w}
                 </button>
@@ -234,21 +236,41 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="card">
-          <h3 className="section-title">Event Types</h3>
+        <div className="card" aria-label="Events by type chart">
+          <h3 className="section-title">Events by Type</h3>
+          <p className="section-subtitle">Share of events across categories</p>
           {donutData.length === 0 ? (
-            <div className="muted">No data</div>
+            <div className="empty-state" role="status" aria-live="polite">
+              <span className="empty-icon" aria-hidden="true">ⓘ</span>
+              <span>No data yet</span>
+            </div>
           ) : (
-            <div style={{ width: "100%", height: 260 }}>
+            <div style={{ width: "100%", height: 280 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={donutData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90} paddingAngle={2}>
-                    {donutData.map((_, idx) => (
+                <PieChart role="img" aria-label="Donut chart showing events distribution by type">
+                  <Pie
+                    data={donutData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={60}
+                    outerRadius={96}
+                    paddingAngle={2}
+                  >
+                    {donutData.map((d, idx) => (
                       <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
-                  <Legend verticalAlign="bottom" height={36} />
+                  <Tooltip
+                    formatter={(value, name, props) => {
+                      const total = donutData.reduce((a, b) => a + b.value, 0);
+                      return [`${value} (${formatPercent(value, total)})`, name];
+                    }}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    height={40}
+                    formatter={(value) => <span aria-label={`Legend: ${value}`}>{value}</span>}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -256,48 +278,88 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="cards">
-        <div className="card">
-          <h3 className="section-title">Signups per Day</h3>
-          <div style={{ width: "100%", height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={signupsData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.1)" />
-                <XAxis dataKey="date" stroke="#111827" />
-                <YAxis allowDecimals={false} stroke="#111827" />
-                <Tooltip />
-                <Bar dataKey="count" fill="var(--color-primary)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+      <section className="cards dashboard-grid" aria-label="Trend charts">
+        <div className="card" aria-label="Daily signups chart">
+          <h3 className="section-title">Daily Signups</h3>
+          <p className="section-subtitle">Number of new user accounts created per day</p>
+          <div style={{ width: "100%", height: 280 }}>
+            {signupsData.length === 0 ? (
+              <div className="empty-state" role="status" aria-live="polite">
+                <span className="empty-icon" aria-hidden="true">ⓘ</span>
+                <span>No data yet</span>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={signupsData}
+                  margin={{ top: 10, right: 16, left: 0, bottom: 0 }}
+                  role="img"
+                  aria-label="Bar chart showing daily signups"
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
+                  <XAxis dataKey="date" stroke="#111827" />
+                  <YAxis allowDecimals={false} stroke="#111827" />
+                  <Tooltip
+                    labelFormatter={(label) => `Date: ${label}`}
+                    formatter={(value) => [`${value} signups`, "Count"]}
+                  />
+                  <Bar dataKey="count" name="Signups" fill="var(--color-primary)" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        <div className="card">
+        <div className="card" aria-label="Active users timeseries">
           <h3 className="section-title">Active Users (last {activeWindow})</h3>
-          <div style={{ width: "100%", height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={activeUsersData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.1)" />
-                <XAxis dataKey="minute" stroke="#111827" />
-                <YAxis allowDecimals={false} stroke="#111827" />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="count" name="Active Users" stroke="#2563EB" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+          <p className="section-subtitle">Unique users active per minute in the selected window</p>
+          <div style={{ width: "100%", height: 280 }}>
+            {activeUsersData.length === 0 ? (
+              <div className="empty-state" role="status" aria-live="polite">
+                <span className="empty-icon" aria-hidden="true">ⓘ</span>
+                <span>No data yet</span>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={activeUsersData}
+                  margin={{ top: 10, right: 16, left: 0, bottom: 0 }}
+                  role="img"
+                  aria-label={`Line chart showing active users per minute in last ${activeWindow}`}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
+                  <XAxis dataKey="minute" stroke="#111827" />
+                  <YAxis allowDecimals={false} stroke="#111827" />
+                  <Tooltip
+                    labelFormatter={(label) => `Time: ${label}`}
+                    formatter={(value) => [`${value} users`, "Active Users"]}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    name="Active Users"
+                    stroke="var(--color-primary)"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </section>
 
-      <section className="card">
+      <section className="card" aria-label="Recent activity table">
         <h3 className="section-title">Recent Activity</h3>
+        <p className="section-subtitle">Most recent user events with timestamps</p>
         <div className="table-scroll">
-          <table className="table">
+          <table className="table" role="table" aria-label="Recent activity list">
             <thead>
               <tr>
-                <th style={{ width: "30%" }}>Username</th>
-                <th style={{ width: "30%" }}>Event Type</th>
-                <th>Timestamp</th>
+                <th style={{ width: "30%" }} scope="col">Username</th>
+                <th style={{ width: "30%" }} scope="col">Event Type</th>
+                <th scope="col">Timestamp</th>
               </tr>
             </thead>
             <tbody>
@@ -316,7 +378,7 @@ export default function Dashboard() {
               })}
               {(!recentActivity || recentActivity.length === 0) ? (
                 <tr>
-                  <td colSpan="3" className="muted">No recent activity.</td>
+                  <td colSpan="3" className="muted">No data yet</td>
                 </tr>
               ) : null}
             </tbody>
