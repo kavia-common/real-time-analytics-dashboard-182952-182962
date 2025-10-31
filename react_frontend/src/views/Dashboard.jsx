@@ -284,10 +284,11 @@ export default function Dashboard() {
         </div>
       ) : null}
 
-      <section className="cards dashboard-grid" aria-label="Top metrics">
-        <div className="card" aria-label="Total events and controls">
-          <h3 className="section-title">Total Events (all time)</h3>
-          <p className="section-subtitle">Cumulative number of user-generated events since tracking began</p>
+      {/* Grid 1: Overview */}
+      <section className="dashboard-grid" aria-label="Top metrics">
+        <div className="dash-card" aria-label="Total events and controls">
+          <h3 className="dash-heading">Total Events (all time)</h3>
+          <p className="dash-subheading">Cumulative number of user-generated events since tracking began</p>
           <TotalCounter total={totalEvents} />
           <div className="control-row" role="group" aria-label="Active users time window">
             <span className="muted">Active users window</span>
@@ -306,16 +307,16 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="card" aria-label="Events by type chart">
-          <h3 className="section-title">Events by Type</h3>
-          <p className="section-subtitle">Share of events across categories</p>
+        <div className="dash-card" aria-label="Events by type chart">
+          <h3 className="dash-heading">Events by Type</h3>
+          <p className="dash-subheading">Share of events across categories</p>
           {donutData.length === 0 ? (
             <div className="empty-state" role="status" aria-live="polite">
               <span className="empty-icon" aria-hidden="true">ⓘ</span>
               <span>No data yet</span>
             </div>
           ) : (
-            <div style={{ width: "100%", height: 280 }}>
+            <div className="chart-container">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart role="img" aria-label="Donut chart showing events distribution by type">
                   <Pie
@@ -331,7 +332,7 @@ export default function Dashboard() {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value, name, props) => {
+                    formatter={(value, name) => {
                       const total = donutData.reduce((a, b) => a + b.value, 0);
                       return [`${value} (${formatPercent(value, total)})`, name];
                     }}
@@ -348,15 +349,16 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="cards dashboard-grid" aria-label="Realtime engagement">
-        <div className="card" aria-label="Users who answered today">
-          <h3 className="section-title">Users Answered Today</h3>
-          <p className="section-subtitle">Unique users who submitted answers today (UTC)</p>
+      {/* Grid 2: Engagement (Heatmap spans 2 columns on md+) */}
+      <section className="dashboard-grid" aria-label="Realtime engagement">
+        <div className="dash-card" aria-label="Users who answered today">
+          <h3 className="dash-heading">Users Answered Today</h3>
+          <p className="dash-subheading">Unique users who submitted answers today (UTC)</p>
           <div className="live-counter" role="status" aria-live="polite" aria-label="Users answered today total">
             <div className="live-counter-number">{Number(usersAnsweredToday?.total || 0)}</div>
             <div className="live-counter-label">Total (today)</div>
           </div>
-          <div style={{ width: "100%", height: 220, marginTop: 10 }}>
+          <div className="chart-container chart-sm">
             {usersAnsweredSeries.length === 0 ? (
               <div className="empty-state" role="status" aria-live="polite">
                 <span className="empty-icon" aria-hidden="true">ⓘ</span>
@@ -376,9 +378,9 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="card" aria-label="Event heatmap">
-          <h3 className="section-title">Event Heatmap</h3>
-          <p className="section-subtitle">Events by day of week and hour (UTC)</p>
+        <div className="dash-card md-col-span-2" aria-label="Event heatmap">
+          <h3 className="dash-heading">Event Heatmap</h3>
+          <p className="dash-subheading">Events by day of week and hour (UTC)</p>
           <div className="control-row">
             <span className="muted">Range</span>
             <div className="segmented">
@@ -408,35 +410,33 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-          <div style={{ width: "100%", overflowX: "auto", marginTop: 10 }}>
+          <div className="heatmap-container">
             {heatmapMatrix.flat().length === 0 ? (
               <div className="empty-state" role="status" aria-live="polite">
                 <span className="empty-icon" aria-hidden="true">ⓘ</span>
                 <span>No data yet</span>
               </div>
             ) : (
-              <div role="img" aria-label="Heatmap grid (rows: days Su-Sa, columns: hours 0-23)" style={{ display: "inline-block", borderRadius: 12, overflow: "hidden", border: "1px solid #e5e7eb" }}>
-                <div style={{ display: "grid", gridTemplateColumns: `repeat(25, 28px)` }}>
-                  {/* Header row */}
-                  <div style={{ background: "#f3f4f6", fontSize: 11, padding: 6, textAlign: "center" }}>D/H</div>
+              <div role="img" aria-label="Heatmap grid (rows: days Su-Sa, columns: hours 0-23)" className="heatmap-grid-wrapper">
+                <div className="heatmap-grid">
+                  <div className="heatmap-header">D/H</div>
                   {Array.from({ length: 24 }).map((_, h) => (
-                    <div key={`h-${h}`} style={{ background: "#f3f4f6", fontSize: 11, padding: 6, textAlign: "center" }}>{h}</div>
+                    <div key={`h-${h}`} className="heatmap-header">{h}</div>
                   ))}
-                  {/* Rows for days 0-6 */}
                   {["Su","Mo","Tu","We","Th","Fr","Sa"].map((dLabel, d) => (
                     <React.Fragment key={`row-${d}`}>
-                      <div style={{ background: "#f3f4f6", fontSize: 11, padding: 6, textAlign: "center" }}>{dLabel}</div>
+                      <div className="heatmap-header">{dLabel}</div>
                       {Array.from({ length: 24 }).map((_, h) => {
                         const val = heatmapMatrix?.[d]?.[h] ?? 0;
-                        // color scale based on value
-                        const max = 10; // simple cap for shading
+                        const max = 10;
                         const intensity = Math.min(1, val / max);
                         const bg = `rgba(37,99,235,${0.1 + intensity * 0.5})`;
                         return (
                           <div
                             key={`cell-${d}-${h}`}
                             title={`Day ${dLabel}, Hour ${h}: ${val}`}
-                            style={{ width: 28, height: 24, background: val === 0 ? "#eef2ff" : bg, border: "1px solid rgba(17,24,39,0.06)" }}
+                            className="heatmap-cell"
+                            style={{ background: val === 0 ? "#eef2ff" : bg }}
                           />
                         );
                       })}
@@ -449,11 +449,12 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="cards dashboard-grid" aria-label="Trend charts">
-        <div className="card" aria-label="Daily signups chart">
-          <h3 className="section-title">Daily Signups</h3>
-          <p className="section-subtitle">Number of new user accounts created per day</p>
-          <div style={{ width: "100%", height: 280 }}>
+      {/* Grid 3: Trends */}
+      <section className="dashboard-grid" aria-label="Trend charts">
+        <div className="dash-card" aria-label="Daily signups chart">
+          <h3 className="dash-heading">Daily Signups</h3>
+          <p className="dash-subheading">Number of new user accounts created per day</p>
+          <div className="chart-container">
             {signupsData.length === 0 ? (
               <div className="empty-state" role="status" aria-live="polite">
                 <span className="empty-icon" aria-hidden="true">ⓘ</span>
@@ -481,10 +482,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="card" aria-label="Active users timeseries">
-          <h3 className="section-title">Active Users (last {activeWindow})</h3>
-          <p className="section-subtitle">Unique users active per minute in the selected window</p>
-          <div style={{ width: "100%", height: 280 }}>
+        <div className="dash-card" aria-label="Active users timeseries">
+          <h3 className="dash-heading">Active Users (last {activeWindow})</h3>
+          <p className="dash-subheading">Unique users active per minute in the selected window</p>
+          <div className="chart-container">
             {activeUsersData.length === 0 ? (
               <div className="empty-state" role="status" aria-live="polite">
                 <span className="empty-icon" aria-hidden="true">ⓘ</span>
@@ -521,9 +522,9 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="card" aria-label="Recent activity table">
-        <h3 className="section-title">Recent Activity</h3>
-        <p className="section-subtitle">Most recent user events with timestamps</p>
+      <section className="dash-card" aria-label="Recent activity table">
+        <h3 className="dash-heading">Recent Activity</h3>
+        <p className="dash-subheading">Most recent user events with timestamps</p>
         <div className="table-scroll">
           <table className="table" role="table" aria-label="Recent activity list">
             <thead>
