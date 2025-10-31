@@ -162,3 +162,55 @@ export async function getEventTypeDistribution() {
   }
   return res.json();
 }
+
+/**
+ * PUBLIC_INTERFACE
+ * getSignupsPerDay
+ * Returns array of { date: 'YYYY-MM-DD', count: number }.
+ */
+export async function getSignupsPerDay() {
+  const base = getApiBaseUrl();
+  const url = `${base}/api/metrics/signups-per-day`;
+  const res = await authorizedFetch(url, { method: "GET" });
+  if (!res.ok) throw new Error(`getSignupsPerDay failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * PUBLIC_INTERFACE
+ * getActiveUsers
+ * Returns per-minute active users series for a given window like '10m'.
+ */
+export async function getActiveUsers(window = "10m") {
+  const base = getApiBaseUrl();
+  const url = `${base}/api/metrics/active-users?window=${encodeURIComponent(window)}`;
+  const res = await authorizedFetch(url, { method: "GET" });
+  if (!res.ok) throw new Error(`getActiveUsers failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * PUBLIC_INTERFACE
+ * getTotalEvents
+ * Returns { total: number }.
+ */
+export async function getTotalEvents() {
+  const base = getApiBaseUrl();
+  const url = `${base}/api/metrics/total-events`;
+  const res = await authorizedFetch(url, { method: "GET" });
+  if (!res.ok) throw new Error(`getTotalEvents failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * PUBLIC_INTERFACE
+ * getRecentActivity
+ * Returns last 10 user events.
+ */
+export async function getRecentActivity() {
+  const base = getApiBaseUrl();
+  const url = `${base}/api/metrics/recent-activity`;
+  const res = await authorizedFetch(url, { method: "GET" });
+  if (!res.ok) throw new Error(`getRecentActivity failed: ${res.status}`);
+  return res.json();
+}

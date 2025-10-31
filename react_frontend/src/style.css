@@ -80,6 +80,9 @@ body {
   gap: 16px;
   margin-bottom: 16px;
 }
+.cards .btn-primary {
+  font-size: 12px;
+}
 
 @media (min-width: 900px) {
   .cards {

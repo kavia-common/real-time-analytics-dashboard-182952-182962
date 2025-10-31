@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import App from "./App.jsx";
+import Dashboard from "./views/Dashboard.jsx";
 import Login from "./views/Login.jsx";
 import Signup from "./views/Signup.jsx";
 import Admin from "./views/Admin.jsx";
@@ -175,7 +176,7 @@ export default function AppRouter() {
           path="/"
           element={
             <ProtectedRoute>
-              <App />
+              <Dashboard />
             </ProtectedRoute>
           }
         />
