@@ -8,7 +8,9 @@ import { authFetch } from "../auth.js";
  * Admin MCQ management page.
  * - Shows a form to create a new MCQ (title/text, 4 options, correct option index)
  * - Lists existing questions from GET /api/questions
- * - Displays basic aggregate counts by option for each question if backend returns per-option counts
+ * - Displays per-option response counts by aggregating answer fields when available
+ * - Connects to POST /api/questions and shows success/error states
+ * - Route protection is enforced by AdminRoute in router.jsx
  */
 export default function Admin() {
   // Form state
@@ -23,12 +25,37 @@ export default function Admin() {
   const [loadingList, setLoadingList] = useState(false);
   const [questions, setQuestions] = useState([]);
 
+  // Allow manual refresh
+  const [refreshing, setRefreshing] = useState(false);
+
   const isFormValid = useMemo(() => {
     const trimmed = text.trim();
     const optsFilled = options.every((o) => o.trim().length > 0);
-    const idxValid = Number.isInteger(correctIndex) && correctIndex >= 0 && correctIndex < options.length;
+    const idxValid =
+      Number.isInteger(correctIndex) &&
+      correctIndex >= 0 &&
+      correctIndex < options.length;
     return trimmed.length > 0 && optsFilled && idxValid;
   }, [text, options, correctIndex]);
+
+  /**
+   * Try to derive option counts from the question structure:
+   * - Prefer q.optionCounts if provided by backend
+   * - Else, if q.answers exists (array of { selectedOptionIndex }), aggregate locally
+   * - Otherwise, return null to indicate no aggregate data
+   */
+  const getOptionCounts = (q) => {
+    if (Array.isArray(q?.optionCounts)) return q.optionCounts;
+    if (Array.isArray(q?.answers)) {
+      const counts = new Array((q.options || []).length).fill(0);
+      for (const a of q.answers) {
+        const idx = typeof a?.selectedOptionIndex === "number" ? a.selectedOptionIndex : -1;
+        if (idx >= 0 && idx < counts.length) counts[idx] += 1;
+      }
+      return counts;
+    }
+    return null;
+  };
 
   // Fetch questions
   const loadQuestions = async () => {
@@ -47,6 +74,7 @@ export default function Admin() {
       setError(e?.message || "Failed to load questions");
     } finally {
       setLoadingList(false);
+      setRefreshing(false);
     }
   };
 
@@ -78,7 +106,10 @@ export default function Admin() {
       // Backend schema expects: { text, options: [{text, key?}], correctOptionIndex, difficulty?, tags? }
       const payload = {
         text: text.trim(),
-        options: options.map((o, i) => ({ text: o.trim(), key: String.fromCharCode(65 + i) })), // A, B, C, D
+        options: options.map((o, i) => ({
+          text: o.trim(),
+          key: String.fromCharCode(65 + i),
+        })), // A, B, C, D
         correctOptionIndex: Number(correctIndex),
       };
       const res = await authFetch("/api/questions", {
@@ -101,15 +132,29 @@ export default function Admin() {
     }
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadQuestions();
+  };
+
   return (
     <div className="app-container">
-      <Header title="Admin: MCQ Management" subtitle="Create and review multiple-choice questions" />
+      <Header
+        title="Admin: MCQ Management"
+        subtitle="Create and review multiple-choice questions"
+      />
 
       <section className="card">
         <h3 className="section-title">Create a new MCQ</h3>
-        {error ? <div className="auth-error" style={{ marginTop: 8 }}>{String(error)}</div> : null}
+        {error ? (
+          <div className="auth-error" style={{ marginTop: 8 }}>
+            {String(error)}
+          </div>
+        ) : null}
         {success ? (
           <div
+            role="status"
+            aria-live="polite"
             style={{
               background: "rgba(245,158,11,0.10)",
               color: "#b45309",
@@ -167,14 +212,28 @@ export default function Admin() {
             </select>
           </label>
 
-          <button type="submit" className="btn-primary auth-submit" disabled={submitting || !isFormValid}>
+          <button
+            type="submit"
+            className="btn-primary auth-submit"
+            disabled={submitting || !isFormValid}
+          >
             {submitting ? "Creating…" : "Create Question"}
           </button>
         </form>
       </section>
 
       <section className="card">
-        <h3 className="section-title">Existing Questions</h3>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h3 className="section-title">Existing Questions</h3>
+          <button
+            className="btn-primary"
+            onClick={onRefresh}
+            disabled={loadingList || refreshing}
+            title="Refresh questions"
+          >
+            {loadingList || refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
         {loadingList ? <div className="muted">Loading questions…</div> : null}
         {!loadingList && questions.length === 0 ? (
           <div className="muted">No questions yet.</div>
@@ -190,34 +249,36 @@ export default function Admin() {
                 </tr>
               </thead>
               <tbody>
-                {questions.map((q) => (
-                  <tr key={q._id || q.text}>
-                    <td>{q.text}</td>
-                    <td>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {(q.options || []).map((o, i) => (
-                          <span key={`${q._id}-opt-${i}`} className="pill">
-                            {String.fromCharCode(65 + i)}. {o?.text || "-"}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td>
-                      {/* Basic aggregate placeholder: if backend adds counts like q.optionCounts = [n0,n1,n2,n3] */}
-                      {Array.isArray(q.optionCounts) ? (
+                {questions.map((q) => {
+                  const counts = getOptionCounts(q);
+                  return (
+                    <tr key={q._id || q.text}>
+                      <td>{q.text}</td>
+                      <td>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {q.optionCounts.map((count, i) => (
-                            <span key={`${q._id}-cnt-${i}`} className="pill pill-view">
-                              {String.fromCharCode(65 + i)}: {count}
+                          {(q.options || []).map((o, i) => (
+                            <span key={`${q._id}-opt-${i}`} className="pill">
+                              {String.fromCharCode(65 + i)}. {o?.text || "-"}
                             </span>
                           ))}
                         </div>
-                      ) : (
-                        <span className="muted">No aggregate data</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td>
+                        {Array.isArray(counts) ? (
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {counts.map((count, i) => (
+                              <span key={`${q._id}-cnt-${i}`} className="pill pill-view">
+                                {String.fromCharCode(65 + i)}: {count}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="muted">No aggregate data</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
