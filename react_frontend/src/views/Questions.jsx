@@ -110,7 +110,14 @@ export default function Questions() {
 
   const user = getStoredUser();
 
-  const COLORS = ["#2563EB", "#F59E0B", "#10B981", "#EF4444", "#8B5CF6", "#06B6D4"];
+  const COLORS = [
+    "var(--chart-palette-1)",
+    "var(--chart-palette-2)",
+    "var(--chart-palette-3)",
+    "var(--chart-palette-4)",
+    "var(--chart-palette-5)",
+    "var(--chart-palette-6)",
+  ];
 
   const handleSelect = (qid, idx) => {
     setSelected((prev) => ({ ...prev, [qid]: idx }));
@@ -142,6 +149,11 @@ export default function Questions() {
 
   const getQuestionId = (q) => q._id || q.id || q.text;
 
+  const numberFmt = (n) => {
+    const v = Number(n || 0);
+    return v.toLocaleString(undefined);
+  };
+
   const Donut = ({ qid, options }) => {
     const data = useMemo(() => {
       const arr = counts[qid] || [];
@@ -157,7 +169,7 @@ export default function Questions() {
     }
 
     return (
-      <div style={{ width: "100%", height: 240 }}>
+      <div style={{ width: "100%", height: 240 }} className="chart-gradient">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -172,8 +184,8 @@ export default function Questions() {
                 <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip />
-            <Legend verticalAlign="bottom" height={36} />
+            <Tooltip formatter={(value, name) => [`${numberFmt(value)}`, name]} />
+            <Legend verticalAlign="bottom" height={36} formatter={(value) => <span style={{ color: "var(--chart-legend-text)" }}>{value}</span>} />
           </PieChart>
         </ResponsiveContainer>
       </div>

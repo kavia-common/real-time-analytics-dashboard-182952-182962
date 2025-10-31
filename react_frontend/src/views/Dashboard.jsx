@@ -58,7 +58,16 @@ export default function Dashboard() {
   const user = getStoredUser();
 
   // Ocean Professional palette
-  const COLORS = ["#2563EB", "#F59E0B", "#10B981", "#EF4444", "#8B5CF6", "#06B6D4", "#0EA5E9", "#14B8A6"];
+  const COLORS = [
+    "var(--chart-palette-1)",
+    "var(--chart-palette-2)",
+    "var(--chart-palette-3)",
+    "var(--chart-palette-4)",
+    "var(--chart-palette-5)",
+    "var(--chart-palette-6)",
+    "var(--chart-palette-7)",
+    "var(--chart-palette-8)",
+  ];
 
   const loadAll = async () => {
     setLoading(true);
@@ -273,6 +282,21 @@ export default function Dashboard() {
     return `${((value / t) * 100).toFixed(1)}%`;
   };
 
+  const numberFmt = (n) => {
+    const v = Number(n || 0);
+    return v.toLocaleString(undefined);
+  };
+
+  const timeFmt = (iso) => {
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return String(iso);
+      return d.toLocaleString(undefined, { hour12: false });
+    } catch {
+      return String(iso);
+    }
+  };
+
   return (
     <div className="app-container">
       <Header title="Real-time Analytics Dashboard" subtitle="Live metrics and user activity" />
@@ -316,7 +340,7 @@ export default function Dashboard() {
               <span>No data yet</span>
             </div>
           ) : (
-            <div className="chart-container">
+            <div className="chart-container chart-gradient">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart role="img" aria-label="Donut chart showing events distribution by type">
                   <Pie
@@ -334,13 +358,14 @@ export default function Dashboard() {
                   <Tooltip
                     formatter={(value, name) => {
                       const total = donutData.reduce((a, b) => a + b.value, 0);
-                      return [`${value} (${formatPercent(value, total)})`, name];
+                      return [`${numberFmt(value)} (${formatPercent(value, total)})`, name];
                     }}
+                    labelFormatter={(label) => `Type: ${label}`}
                   />
                   <Legend
                     verticalAlign="bottom"
                     height={40}
-                    formatter={(value) => <span aria-label={`Legend: ${value}`}>{value}</span>}
+                    formatter={(value) => <span style={{ color: "var(--chart-legend-text)" }} aria-label={`Legend: ${value}`}>{value}</span>}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -358,7 +383,7 @@ export default function Dashboard() {
             <div className="live-counter-number">{Number(usersAnsweredToday?.total || 0)}</div>
             <div className="live-counter-label">Total (today)</div>
           </div>
-          <div className="chart-container chart-sm">
+          <div className="chart-container chart-sm chart-gradient">
             {usersAnsweredSeries.length === 0 ? (
               <div className="empty-state" role="status" aria-live="polite">
                 <span className="empty-icon" aria-hidden="true">ⓘ</span>
@@ -367,11 +392,19 @@ export default function Dashboard() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={usersAnsweredSeries} margin={{ top: 10, right: 16, left: 0, bottom: 0 }} role="img" aria-label="Users answered today per minute">
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
-                  <XAxis dataKey="time" stroke="#111827" />
-                  <YAxis allowDecimals={false} stroke="#111827" />
-                  <Tooltip labelFormatter={(label) => `Time: ${label}`} formatter={(value) => [`${value} users`, "Unique Users"]} />
-                  <Line type="monotone" dataKey="value" name="Unique Users" stroke="var(--color-secondary)" strokeWidth={2} dot={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid-stroke)" />
+                  <XAxis dataKey="time" stroke="var(--chart-axis-stroke)" tick={{ fontSize: 12 }} tickFormatter={timeFmt} />
+                  <YAxis allowDecimals={false} stroke="var(--chart-axis-stroke)" tick={{ fontSize: 12 }} tickFormatter={numberFmt} />
+                  <Tooltip labelFormatter={(label) => `Time: ${timeFmt(label)}`} formatter={(value) => [`${numberFmt(value)} users`, "Unique Users"]} />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    name="Unique Users"
+                    stroke="var(--color-secondary)"
+                    strokeWidth={2}
+                    dot={{ r: 2 }}
+                    activeDot={{ r: 5 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -454,7 +487,7 @@ export default function Dashboard() {
         <div className="dash-card" aria-label="Daily signups chart">
           <h3 className="dash-heading">Daily Signups</h3>
           <p className="dash-subheading">Number of new user accounts created per day</p>
-          <div className="chart-container">
+          <div className="chart-container chart-gradient">
             {signupsData.length === 0 ? (
               <div className="empty-state" role="status" aria-live="polite">
                 <span className="empty-icon" aria-hidden="true">ⓘ</span>
@@ -468,14 +501,14 @@ export default function Dashboard() {
                   role="img"
                   aria-label="Bar chart showing daily signups"
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
-                  <XAxis dataKey="date" stroke="#111827" />
-                  <YAxis allowDecimals={false} stroke="#111827" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid-stroke)" />
+                  <XAxis dataKey="date" stroke="var(--chart-axis-stroke)" tick={{ fontSize: 12 }} />
+                  <YAxis allowDecimals={false} stroke="var(--chart-axis-stroke)" tick={{ fontSize: 12 }} tickFormatter={numberFmt} />
                   <Tooltip
                     labelFormatter={(label) => `Date: ${label}`}
-                    formatter={(value) => [`${value} signups`, "Count"]}
+                    formatter={(value) => [`${numberFmt(value)} signups`, "Count"]}
                   />
-                  <Bar dataKey="count" name="Signups" fill="var(--color-primary)" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="count" name="Signups" fill="var(--chart-palette-1)" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -499,21 +532,22 @@ export default function Dashboard() {
                   role="img"
                   aria-label={`Line chart showing active users per minute in last ${activeWindow}`}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
-                  <XAxis dataKey="minute" stroke="#111827" />
-                  <YAxis allowDecimals={false} stroke="#111827" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid-stroke)" />
+                  <XAxis dataKey="minute" stroke="var(--chart-axis-stroke)" tick={{ fontSize: 12 }} tickFormatter={timeFmt} />
+                  <YAxis allowDecimals={false} stroke="var(--chart-axis-stroke)" tick={{ fontSize: 12 }} tickFormatter={numberFmt} />
                   <Tooltip
-                    labelFormatter={(label) => `Time: ${label}`}
-                    formatter={(value) => [`${value} users`, "Active Users"]}
+                    labelFormatter={(label) => `Time: ${timeFmt(label)}`}
+                    formatter={(value) => [`${numberFmt(value)} users`, "Active Users"]}
                   />
-                  <Legend />
+                  <Legend formatter={(value) => <span style={{ color: "var(--chart-legend-text)" }}>{value}</span>} />
                   <Line
                     type="monotone"
                     dataKey="count"
                     name="Active Users"
-                    stroke="var(--color-primary)"
+                    stroke="var(--chart-palette-1)"
                     strokeWidth={2}
-                    dot={false}
+                    dot={{ r: 0 }}
+                    activeDot={{ r: 5 }}
                   />
                 </LineChart>
               </ResponsiveContainer>

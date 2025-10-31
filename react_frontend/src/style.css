@@ -1,15 +1,32 @@
 :root {
-  --color-primary: #2563EB; /* blue-600 */
-  --color-secondary: #F59E0B; /* amber-500 */
-  --color-success: #F59E0B; /* same as secondary (success/highlight) */
-  --color-error: #EF4444; /* red-500 */
-  --color-bg: #f9fafb; /* gray-50 */
+  /* Ocean Professional palette */
+  --color-primary: #2563EB; /* Blue 600 */
+  --color-primary-600: #2563EB;
+  --color-primary-500: #3B82F6;
+  --color-primary-400: #60A5FA;
+
+  --color-secondary: #F59E0B; /* Amber 500 */
+  --color-secondary-600: #D97706;
+  --color-secondary-400: #FBBF24;
+
+  --color-success: #10B981; /* Emerald 500 */
+  --color-error: #EF4444;   /* Red 500 */
+  --color-warning: #F59E0B; /* Amber 500 */
+
+  --color-bg: #f9fafb;      /* Gray 50 */
   --color-surface: #ffffff;
-  --color-text: #111827; /* gray-900 */
+  --color-surface-muted: #f3f4f6; /* Gray 100 */
+  --color-text: #111827;    /* Gray 900 */
+  --color-text-muted: #4b5563; /* Gray 600 */
+  --color-border: #e5e7eb;  /* Gray 200 */
 
   --radius: 12px;
+  --radius-sm: 8px;
+
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
   --shadow-md: 0 6px 16px rgba(37,99,235,0.08);
+  --shadow-lg: 0 16px 32px rgba(37,99,235,0.10);
+
   --transition: 160ms ease-in-out;
 
   /* Spacing scale */
@@ -19,19 +36,41 @@
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
 
   /* Typography scale */
+  --font-caption: 12px;
   --font-xs: 12px;
   --font-sm: 13px;
   --font-md: 14px;
   --font-lg: 16px;
   --font-xl: 18px;
+  --font-2xl: 22px;
 
   /* Grid gaps and breakpoints */
   --grid-gap: 16px;
   --bp-sm: 640px;
   --bp-md: 864px;
   --bp-lg: 1200px;
+
+  /* Chart tokens */
+  --chart-grid-stroke: rgba(17,24,39,0.08);
+  --chart-axis-stroke: #111827;
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-border: rgba(17,24,39,0.12);
+  --chart-legend-text: #374151;
+  --chart-palette-1: #2563EB;
+  --chart-palette-2: #F59E0B;
+  --chart-palette-3: #10B981;
+  --chart-palette-4: #EF4444;
+  --chart-palette-5: #8B5CF6;
+  --chart-palette-6: #06B6D4;
+  --chart-palette-7: #0EA5E9;
+  --chart-palette-8: #14B8A6;
+
+  /* Accessibility */
+  --focus-ring: 3px solid rgba(37,99,235,0.45);
 }
 
 *,
@@ -70,12 +109,15 @@ body {
 }
 .header h1 {
   margin: 0;
-  font-size: 1.6rem;
+  font-size: var(--font-2xl);
+  line-height: 1.2;
   color: var(--color-primary);
+  letter-spacing: -0.01em;
 }
 .header p {
   margin: 4px 0 0 0;
-  color: #374151;
+  color: var(--color-text-muted);
+  font-size: var(--font-md);
 }
 
 /* Meta badges */
@@ -155,12 +197,23 @@ body {
 /* Chart container with maintained aspect via fixed height */
 .chart-container {
   width: 100%;
+  min-height: 220px;
   height: 280px;
   overflow: hidden;
+  position: relative;
+}
+@media (max-width: 480px) {
+  .chart-container { height: 240px; }
 }
 .chart-sm {
   height: 220px;
 }
+.chart-gradient {
+  background: linear-gradient(180deg, rgba(37,99,235,0.04), rgba(255,255,255,0.9));
+  border-radius: var(--radius);
+}
+.section-title { margin: 0 0 4px; color: #1f2937; font-weight: 700; }
+.section-subtitle { margin: 0 0 12px; color: var(--color-text-muted); font-size: var(--font-sm); }
 
 /* Heatmap container */
 .heatmap-container {
@@ -172,17 +225,19 @@ body {
   display: inline-block;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 .heatmap-grid {
   display: grid;
   grid-template-columns: repeat(25, 28px);
 }
 .heatmap-header {
-  background: #f3f4f6;
+  background: var(--color-surface-muted);
   font-size: 11px;
   padding: 6px;
   text-align: center;
+  color: var(--color-text-muted);
 }
 .heatmap-cell {
   width: 28px;
@@ -193,7 +248,7 @@ body {
 /* Typographic utilities */
 .h1, .header h1 { font-size: 1.6rem; }
 .h2 { font-size: 1.25rem; }
-.text-muted, .muted { color: #6b7280; }
+.text-muted, .muted { color: var(--color-text-muted); }
 
 /* Section headings (kept for components that use .section-*) */
 .section-title { margin: 0 0 4px; color: #1f2937; }
@@ -204,7 +259,7 @@ body {
   margin-top: 14px;
   padding: 10px 14px;
   background: var(--color-primary);
-  color: white;
+  color: #fff;
   border: none;
   border-radius: 10px;
   cursor: pointer;
@@ -216,7 +271,7 @@ body {
   box-shadow: 0 12px 22px rgba(37,99,235,0.25);
 }
 .btn-primary:focus-visible {
-  outline: 3px solid rgba(37,99,235,0.45);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 .btn-primary:active {
@@ -276,7 +331,7 @@ body {
   transform: scale(1.08);
 }
 .live-counter-label {
-  color: #374151;
+  color: var(--color-text-muted);
   font-weight: 600;
 }
 
@@ -292,12 +347,13 @@ body {
 .table td {
   text-align: left;
   padding: 10px 12px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 .table th {
   font-size: 0.9rem;
-  color: #374151;
-  background: #f3f4f6;
+  color: var(--color-text-muted);
+  background: var(--color-surface-muted);
+  font-weight: 700;
 }
 .table tr:hover td {
   background: #f9fafb;
@@ -309,14 +365,14 @@ body {
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   background: #eef2ff;
   color: var(--color-primary);
 }
-.pill-click { background: rgba(37,99,235,0.1); color: #1d4ed8; }
-.pill-view { background: rgba(245,158,11,0.12); color: #b45309; }
-.pill-signup { background: rgba(16,185,129,0.12); color: #047857; }
-.pill-unknown { background: rgba(107,114,128,0.12); color: #374151; }
+.pill-click { background: rgba(37,99,235,0.12); color: #1d4ed8; }
+.pill-view { background: rgba(245,158,11,0.14); color: #b45309; }
+.pill-signup { background: rgba(16,185,129,0.14); color: #047857; }
+.pill-unknown { background: rgba(107,114,128,0.14); color: #374151; }
 
 /* Footer */
 .footer {
@@ -381,6 +437,21 @@ body {
 }
 .muted {
   color: #6b7280;
+}
+
+/* Recharts tooltip defaults */
+.recharts-default-tooltip {
+  background: var(--chart-tooltip-bg) !important;
+  border: 1px solid var(--chart-tooltip-border) !important;
+  border-radius: 8px !important;
+  box-shadow: var(--shadow-sm) !important;
+  color: var(--color-text) !important;
+  padding: 8px 10px !important;
+  font-size: var(--font-sm) !important;
+}
+.recharts-legend-item-text {
+  color: var(--chart-legend-text) !important;
+  font-size: var(--font-sm);
 }
 
 /* Skeletons and Empty states */
