@@ -1,37 +1,47 @@
-# Frontend Environment Variables and Deployment Notes
+# Frontend Environment Variables and Deployment Guide
 
-This React (Vite) frontend reads the following vars (envPrefix: VITE_). Set them in your deployment environment (e.g., .env.production) before building.
+This React (Vite) frontend consumes environment variables prefixed with VITE_. Configure them in your deployment environment before building (e.g., .env.production for CI/build steps).
 
-Required for production:
-- VITE_BACKEND_URL: Absolute base URL for REST API calls. Example: https://api.example.com
-  - If missing in production, the app logs a warning at runtime and will attempt same-origin requests (e.g., /api/...).
+Variables table:
+- VITE_BACKEND_URL: Required in production. Absolute base URL for REST API.
+  - Example: https://api.example.com
+  - If absent in production, the app will warn at startup and fall back to same-origin requests.
+- VITE_SOCKET_URL: Optional. Absolute base URL for Socket.io (ws).
+  - Fallback order: VITE_SOCKET_URL -> VITE_BACKEND_URL -> same-origin (window.location.origin).
+- VITE_API_BASE_URL: Optional legacy alias for REST base. Only used if VITE_BACKEND_URL is unset.
+- VITE_MONGODB_URI: Backend only; listed for reference.
+- VITE_FRONTEND_ORIGIN: Backend only; listed for reference.
+- VITE_PORT, VITE_HOST: Backend dev config; listed for reference.
+- VITE_JWT_SECRET, VITE_TOKEN_EXPIRES_IN: Backend auth; listed for reference.
+- VITE_ADMIN_EMAIL, VITE_ADMIN_PASSWORD: Backend seeding; listed for reference.
 
-Optional:
-- VITE_API_BASE_URL: Legacy fallback for REST API base URL (only used if VITE_BACKEND_URL is not defined).
-- VITE_SOCKET_URL: Socket.io endpoint for real-time updates. If omitted, the frontend falls back to:
-  1) VITE_BACKEND_URL (if set), otherwise
-  2) same-origin (window.location.origin).
-
-Other app vars supported by this repository:
-- VITE_MONGODB_URI, VITE_FRONTEND_ORIGIN, VITE_PORT, VITE_HOST, VITE_JWT_SECRET, VITE_TOKEN_EXPIRES_IN, VITE_ADMIN_EMAIL, VITE_ADMIN_PASSWORD
-(Only relevant to the backend; listed here because they appear in the project .env set.)
-
-Client behavior and CORS notes:
-- All REST calls are made via fetch to `${VITE_BACKEND_URL}/api/...` (or fallback as described).
-- The client NEVER uses credentials: 'include' on fetch. It uses Authorization: Bearer <token> headers only.
-- Ensure your backend CORS allows the frontend origin (Vite dev or deployed site) without credentials.
+Behavioral notes:
+- All REST calls are constructed with VITE_BACKEND_URL when set; otherwise same-origin.
+- Authorization is via Bearer tokens in headers. The client never sets credentials: 'include'.
+- Socket.io is initialized against VITE_SOCKET_URL (or fallback chain above) and does not use withCredentials.
+- CORS: Ensure the backend allows the frontend origin without credentials.
 
 Development:
-- Vite dev server proxies /api and /socket.io to localhost:3001 (see vite.config.js).
-- A small developer diagnostics banner appears in development (bottom-right) showing current API and Socket URLs.
+- vite.config.js proxies:
+  - /api -> http://localhost:3001
+  - /socket.io -> http://localhost:3001
+- A dev-only diagnostics banner shows the effective API and Socket URLs at the bottom right.
 
-Deployment checklist:
-1) Set VITE_BACKEND_URL to your deployed backend (e.g., https://your-backend.example.com).
-2) Optionally set VITE_SOCKET_URL if websockets should use a different host.
-3) Build the frontend: npm run build (or your CI).
-4) Serve the dist/ or host statically behind your chosen web server or the backend if integrated.
-5) Verify the browser console has no [config] warnings and that all REST calls point to the intended host.
+Build and deploy (static hosting or served by backend):
+1) Create .env.production with:
+   - VITE_BACKEND_URL=https://your-backend.example.com
+   - (optional) VITE_SOCKET_URL=https://your-backend.example.com
+2) Build: npm ci && npm run build
+3) Serve the dist/ directory via your web server or integrate with your backend's static hosting.
+4) Verify in browser console:
+   - [config] Effective API base: ...
+   - [config] Effective Socket base: ...
+   - No production warning about missing VITE_BACKEND_URL.
 
 Troubleshooting:
-- If you see a console warning in production "[config] VITE_BACKEND_URL is not set...", define VITE_BACKEND_URL and redeploy.
-- If sockets fail to connect, confirm VITE_SOCKET_URL or fallback host matches your backend Socket.io server and that path=/socket.io is available.
+- Production warning about VITE_BACKEND_URL missing:
+  - Set VITE_BACKEND_URL to the correct backend origin and redeploy.
+- Socket connection issues:
+  - Ensure the resolved socket base exposes /socket.io and supports websocket/polling.
+  - Consider explicitly setting VITE_SOCKET_URL if Socket.io is hosted on a different origin.
+

@@ -1,9 +1,6 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig } from 'vite'
 
-export default defineConfig(({ mode }) => {
-  // Load the environment variables from .env.production or .env
-  const env = loadEnv(mode, process.cwd(), 'VITE_')
-
+export default defineConfig(() => {
   return {
     server: {
       host: '0.0.0.0',

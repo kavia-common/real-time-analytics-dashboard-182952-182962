@@ -1,5 +1,13 @@
-const defaultBase = "";
-// Guard window access for Node lint/build environments
+//
+// API utilities for REST and Socket configuration
+//
+
+/* eslint-disable no-console */
+
+// Same-origin sentinel for building URLs when no env is provided
+const SAME_ORIGIN = "";
+
+// Resolve same-origin for sockets when window is available
 const defaultSocket =
   typeof globalThis !== "undefined" && typeof globalThis.window !== "undefined"
     ? globalThis.window.location.origin
@@ -13,232 +21,23 @@ const defaultSocket =
  * Backward compatibility fallback: VITE_API_BASE_URL
  * If neither is set, returns empty string which means "same-origin".
  */
-/**
- * PUBLIC_INTERFACE
- * getApiBaseUrl
- * Resolves the REST API base URL from env or falls back to same origin.
- */
 export function getApiBaseUrl() {
   const env = import.meta?.env;
-  
-  // Debug all environment variables
-  console.log('🔧 Environment Variables:', {
-    VITE_BACKEND_URL: env?.VITE_BACKEND_URL,
-    VITE_API_BASE_URL: env?.VITE_API_BASE_URL,
-    MODE: env?.MODE,
-    PROD: env?.PROD,
-    DEV: env?.DEV
-  });
+  const base = env?.VITE_BACKEND_URL ?? env?.VITE_API_BASE_URL ?? SAME_ORIGIN;
 
-  // Try to get backend URL from environment variables
-  const backendUrl = env?.VITE_BACKEND_URL || env?.VITE_API_BASE_URL;
-  
-  if (backendUrl) {
-    console.log('🔧 Using backend URL from environment:', backendUrl);
-    return backendUrl;
-  }
-
-  // Production fallback - use your actual backend URL
-  if (env?.MODE === 'production' || env?.PROD === true) {
-    const productionBackendUrl = 'https://kavia-alb-fa100ecf-1245176832.backend.kavia.app';
-    console.log('🔧 Using hardcoded production backend URL:', productionBackendUrl);
-    return productionBackendUrl;
-  }
-
-  // Development fallback
-  console.log('🔧 Using default base URL (same origin)');
-  return "";
-}
-
-/**
- * PUBLIC_INTERFACE
- * getSocketUrl
- * Resolves the Socket.io server URL with priority:
- * - VITE_SOCKET_URL
- * - VITE_BACKEND_URL
- * - same-origin (window.location.origin)
- */
-export function getSocketUrl() {
-  const env = import.meta?.env;
-  const socket = env?.VITE_SOCKET_URL;
-  if (socket && String(socket).trim() !== "") return socket;
-
-  const backend = env?.VITE_BACKEND_URL ?? env?.VITE_API_BASE_URL ?? "";
-  if (backend && String(backend).trim() !== "") return backend;
-
-  return defaultSocket;
-}
-
-/**
- * PUBLIC_INTERFACE
- * authorizedFetch
- * A thin wrapper that attaches Authorization header if auth.js provides a token.
- */
-export async function authorizedFetch(url, options = {}) {
-  let headers = { ...(options.headers || {}), "Content-Type": "application/json" };
-
-  // Debug logging
-  console.log('🔧 authorizedFetch called:', {
-    url,
-    method: options.method || 'GET',
-    hasAuthHeader: !!headers.Authorization
-  });
-
-  // Decide which token to attach based on URL path without referencing global URL/window
+  // Build-time/runtime guard: warn in production if BACKEND_URL missing.
   try {
-    // Extract pathname safely from absolute or relative URL
-    let pathname = "";
-    if (typeof url === "string") {
-      if (url.startsWith("http://") || url.startsWith("https://")) {
-        // Absolute URL: find the first slash after protocol and hostname
-        // e.g., https://host:port/path?query -> extract /path...
-        const idxProto = url.indexOf("://");
-        if (idxProto !== -1) {
-          const afterProto = url.slice(idxProto + 3);
-          const slashIdx = afterProto.indexOf("/");
-          if (slashIdx !== -1) {
-            pathname = afterProto.slice(slashIdx);
-          } else {
-            pathname = "/";
-          }
-        }
-      } else {
-        // Relative URL: ensure it begins with /
-        pathname = url.startsWith("/") ? url : `/${url}`;
-      }
+    const isProd = env?.PROD === true || env?.MODE === "production";
+    if (isProd && !env?.VITE_BACKEND_URL && typeof console !== "undefined") {
+      console.warn(
+        "[config] VITE_BACKEND_URL is not set in production; frontend will use same-origin for REST calls. Set VITE_BACKEND_URL to your backend URL."
+      );
     }
-
-    console.log('🔧 Extracted pathname:', pathname);
-
-    if (pathname.startsWith("/api/admin")) {
-      const adminMod = await import("./adminAuth.js");
-      const aToken = adminMod.getAdminToken?.();
-      if (aToken) {
-        headers = { ...headers, Authorization: `Bearer ${aToken}` };
-        console.log('🔧 Added admin token');
-      }
-    } else {
-      const userMod = await import("./auth.js");
-      const uToken = userMod.getToken?.();
-      if (uToken) {
-        headers = { ...headers, Authorization: `Bearer ${uToken}` };
-        console.log('🔧 Added user token');
-      }
-    }
-  } catch (error) {
-    console.warn('🔧 Token attachment failed:', error);
+  } catch {
+    // ignore any env access errors
   }
 
-  const f = typeof globalThis !== "undefined" && globalThis.fetch ? globalThis.fetch : null;
-  if (!f) throw new Error("fetch is not available in this environment");
-  
-  // FIX: Include credentials for CORS - THIS IS CRITICAL!
-  const fetchOptions = {
-    credentials: "include",  // ← THIS FIXES THE 405 ERROR
-    ...options, 
-    headers 
-  };
-
-  console.log('🔧 Final fetch options:', {
-    url,
-    credentials: fetchOptions.credentials,
-    method: fetchOptions.method,
-    headers: fetchOptions.headers
-  });
-
-  try {
-    const response = await f(url, fetchOptions);
-    
-    console.log('🔧 authorizedFetch response:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      url: response.url
-    });
-
-    return response;
-  } catch (error) {
-    console.error('🔧 authorizedFetch error:', error);
-    throw error;
-  }
-}
-
-/**
- * PUBLIC_INTERFACE
- * testBackendConnection
- * Tests backend connectivity and CORS configuration
- */
-export async function testBackendConnection() {
-  try {
-    const baseUrl = getApiBaseUrl();
-    const testUrl = `${baseUrl}/api/health`;
-    
-    console.log('🔧 Testing backend connection to:', testUrl);
-    console.log('🔧 Using base URL:', baseUrl);
-    
-    const response = await fetch(testUrl, {
-      method: 'GET',
-      credentials: 'include', // Important for CORS!
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    const result = {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      url: testUrl
-    };
-    
-    console.log('🔧 Backend connection test result:', result);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('🔧 Backend error response:', errorText);
-      result.error = errorText;
-    } else {
-      try {
-        const healthData = await response.json();
-        console.log('🔧 Backend health data:', healthData);
-        result.data = healthData;
-      } catch (parseError) {
-        console.warn('🔧 Could not parse health response:', parseError);
-      }
-    }
-    
-    return result;
-  } catch (error) {
-    console.error('🔧 Backend connection test failed:', error);
-    return {
-      ok: false,
-      error: error.message,
-      url: 'Unknown'
-    };
-  }
-}
-
-/**
- * PUBLIC_INTERFACE
- * debugEnvironment
- * Logs current environment configuration for debugging
- */
-export function debugEnvironment() {
-  const env = import.meta?.env;
-  const config = {
-    VITE_BACKEND_URL: env?.VITE_BACKEND_URL,
-    VITE_API_BASE_URL: env?.VITE_API_BASE_URL,
-    VITE_SOCKET_URL: env?.VITE_SOCKET_URL,
-    MODE: env?.MODE,
-    PROD: env?.PROD,
-    DEV: env?.DEV,
-    baseUrl: getApiBaseUrl(),
-    socketUrl: getSocketUrl(),
-    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Server'
-  };
-  
-  console.log('🔧 Environment Configuration:', config);
-  return config;
+  return base || SAME_ORIGIN;
 }
 
 /**
@@ -270,6 +69,81 @@ export async function getEventHeatmap(range = "7d") {
 
 /**
  * PUBLIC_INTERFACE
+ * getSocketUrl
+ * Resolves the Socket.io server URL with priority:
+ * - VITE_SOCKET_URL
+ * - VITE_BACKEND_URL
+ * - same-origin (window.location.origin)
+ */
+export function getSocketUrl() {
+  const env = import.meta?.env;
+  const socket = env?.VITE_SOCKET_URL;
+  if (socket && String(socket).trim() !== "") return socket;
+
+  const backend = env?.VITE_BACKEND_URL ?? env?.VITE_API_BASE_URL ?? "";
+  if (backend && String(backend).trim() !== "") return backend;
+
+  return defaultSocket;
+}
+
+/**
+ * PUBLIC_INTERFACE
+ * authorizedFetch
+ * A thin wrapper that attaches Authorization header if auth.js provides a token.
+ * Note: Never sets credentials: 'include'.
+ */
+export async function authorizedFetch(url, options = {}) {
+  let headers = { ...(options.headers || {}), "Content-Type": "application/json" };
+
+  // Decide which token to attach based on URL path without referencing global URL/window
+  try {
+    // Extract pathname safely from absolute or relative URL
+    let pathname = "";
+    if (typeof url === "string") {
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        // Absolute URL: find the first slash after protocol and hostname
+        const idxProto = url.indexOf("://");
+        if (idxProto !== -1) {
+          const afterProto = url.slice(idxProto + 3);
+          const slashIdx = afterProto.indexOf("/");
+          if (slashIdx !== -1) {
+            pathname = afterProto.slice(slashIdx);
+          } else {
+            pathname = "/";
+          }
+        }
+      } else {
+        // Relative URL: ensure it begins with /
+        pathname = url.startsWith("/") ? url : `/${url}`;
+      }
+    }
+
+    if (pathname.startsWith("/api/admin")) {
+      const adminMod = await import("./adminAuth.js");
+      const aToken = adminMod.getAdminToken?.();
+      if (aToken) {
+        headers = { ...headers, Authorization: `Bearer ${aToken}` };
+      }
+    } else {
+      const userMod = await import("./auth.js");
+      const uToken = userMod.getToken?.();
+      if (uToken) {
+        headers = { ...headers, Authorization: `Bearer ${uToken}` };
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  const f = typeof globalThis !== "undefined" && typeof globalThis.fetch === "function" ? globalThis.fetch : null;
+  if (!f) throw new Error("fetch is not available in this environment");
+
+  // Do NOT send credentials (cookies). We rely solely on Bearer tokens for auth.
+  return f(url, { ...options, headers });
+}
+
+/**
+ * PUBLIC_INTERFACE
  * getEvents
  * Fetches the latest events from GET /api/events.
  */
@@ -296,6 +170,7 @@ export async function createEvent(payload) {
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
+    if (typeof console !== "undefined") console.warn("createEvent failed status:", res.status);
     throw new Error(`createEvent failed: ${res.status}`);
   }
   return res.json();
