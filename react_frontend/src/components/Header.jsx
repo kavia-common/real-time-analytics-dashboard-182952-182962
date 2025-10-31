@@ -66,7 +66,9 @@ export default function Header({ title, subtitle }) {
         <h1>{title}</h1>
         {subtitle ? <p>{subtitle}</p> : null}
       </div>
-      <div className="header-user">
+      <div className="header-user" style={{ gap: 16 }}>
+        <a className="btn-link" href="/">Dashboard</a>
+        {user ? <a className="btn-link" href="/questions">Questions</a> : null}
         {loading ? (
           <span className="muted">Loading…</span>
         ) : user ? (

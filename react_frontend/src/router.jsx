@@ -4,6 +4,7 @@ import App from "./App.jsx";
 import Login from "./views/Login.jsx";
 import Signup from "./views/Signup.jsx";
 import Admin from "./views/Admin.jsx";
+import Questions from "./views/Questions.jsx";
 import { getToken, getCurrentUser, getStoredUser, setStoredUser, clearAuth } from "./auth.js";
 
 /**
@@ -107,6 +108,14 @@ export default function AppRouter() {
           element={
             <ProtectedRoute>
               <App />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/questions"
+          element={
+            <ProtectedRoute>
+              <Questions />
             </ProtectedRoute>
           }
         />

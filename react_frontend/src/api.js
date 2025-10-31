@@ -81,3 +81,52 @@ export async function createEvent(payload) {
   }
   return res.json();
 }
+
+/**
+ * PUBLIC_INTERFACE
+ * getQuestions
+ * Fetches public MCQ questions from GET /api/questions.
+ */
+export async function getQuestions() {
+  const base = getApiBaseUrl();
+  const url = `${base}/api/questions`;
+  const res = await authorizedFetch(url, { method: "GET" });
+  if (!res.ok) {
+    throw new Error(`getQuestions failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * PUBLIC_INTERFACE
+ * submitAnswer
+ * Submits an answer via POST /api/answers.
+ */
+export async function submitAnswer(payload) {
+  const base = getApiBaseUrl();
+  const url = `${base}/api/answers`;
+  const res = await authorizedFetch(url, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(t || `submitAnswer failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * PUBLIC_INTERFACE
+ * getEventTypeDistribution
+ * Fetches distribution of event types for pie/donut charts.
+ */
+export async function getEventTypeDistribution() {
+  const base = getApiBaseUrl();
+  const url = `${base}/api/metrics/event-types`;
+  const res = await authorizedFetch(url, { method: "GET" });
+  if (!res.ok) {
+    throw new Error(`getEventTypeDistribution failed: ${res.status}`);
+  }
+  return res.json();
+}

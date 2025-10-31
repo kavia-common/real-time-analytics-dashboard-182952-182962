@@ -318,3 +318,11 @@ body {
   color: #374151;
   text-align: center;
 }
+
+/* Questions page tweaks */
+.card .auth-label input[type="radio"] {
+  accent-color: var(--color-primary);
+}
+.card .auth-label:hover {
+  background: linear-gradient(135deg, rgba(37,99,235,0.06), rgba(255,255,255,1));
+}
