@@ -6,12 +6,11 @@ import { authorizedFetch } from "../api.js";
 /**
  * PUBLIC_INTERFACE
  * Admin
- * Admin MCQ management page.
- * - Shows a form to create a new MCQ (title/text, 4 options, correct option index)
- * - Lists existing questions from GET /api/questions
- * - Displays per-option response counts by aggregating answer fields when available
- * - Connects to POST /api/questions and shows success/error states
- * - Route protection is enforced by AdminRoute in router.jsx
+ * Admin MCQ management page with a modern, responsive 2x2 card layout.
+ * - Create MCQ form presented as a card
+ * - Questions rendered as cards in a responsive grid (1 col on small, 2 cols on md+, 3 on xl)
+ * - Shows option chips with correct option highlight (when derivable), quick stats, and actions
+ * - Loading and empty states; subtle animations on create success
  */
 export default function Admin() {
   // Form state
@@ -21,6 +20,7 @@ export default function Admin() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [animateSuccess, setAnimateSuccess] = useState(false);
 
   // Questions list
   const [loadingList, setLoadingList] = useState(false);
@@ -29,6 +29,7 @@ export default function Admin() {
   // Allow manual refresh
   const [refreshing, setRefreshing] = useState(false);
 
+  // Derived validation
   const isFormValid = useMemo(() => {
     const trimmed = text.trim();
     const optsFilled = options.every((o) => o.trim().length > 0);
@@ -50,7 +51,8 @@ export default function Admin() {
     if (Array.isArray(q?.answers)) {
       const counts = new Array((q.options || []).length).fill(0);
       for (const a of q.answers) {
-        const idx = typeof a?.selectedOptionIndex === "number" ? a.selectedOptionIndex : -1;
+        const idx =
+          typeof a?.selectedOptionIndex === "number" ? a.selectedOptionIndex : -1;
         if (idx >= 0 && idx < counts.length) counts[idx] += 1;
       }
       return counts;
@@ -63,14 +65,12 @@ export default function Admin() {
     setLoadingList(true);
     setError("");
     try {
-      // Public listing does not require admin; use generic authorizedFetch (no token needed)
       const res = await authorizedFetch("/api/questions", { method: "GET" });
       if (!res.ok) {
         const t = await res.text().catch(() => "");
         throw new Error(t || `Failed to fetch questions: ${res.status}`);
       }
       const data = await res.json();
-      // Expect array of { _id, text, options: [{text,key}], ... } (public, no correct index)
       setQuestions(Array.isArray(data) ? data : []);
     } catch (e) {
       setError(e?.message || "Failed to load questions");
@@ -105,13 +105,12 @@ export default function Admin() {
     setError("");
     setSuccess("");
     try {
-      // Backend schema expects: { text, options: [{text, key?}], correctOptionIndex, difficulty?, tags? }
       const payload = {
         text: text.trim(),
         options: options.map((o, i) => ({
           text: o.trim(),
           key: String.fromCharCode(65 + i),
-        })), // A, B, C, D
+        })), // A, B, C, D keys
         correctOptionIndex: Number(correctIndex),
       };
       const res = await adminAuthFetch("/api/questions", {
@@ -126,7 +125,10 @@ export default function Admin() {
       setSuccess("Question created successfully.");
       resetForm();
       // Reload list
-      loadQuestions();
+      await loadQuestions();
+      // Subtle animation pulse for success
+      setAnimateSuccess(true);
+      window.setTimeout(() => setAnimateSuccess(false), 450);
     } catch (e) {
       setError(e?.message || "Failed to create question");
     } finally {
@@ -139,6 +141,81 @@ export default function Admin() {
     await loadQuestions();
   };
 
+  // Helpers
+  const numberFmt = (n) => {
+    const v = Number(n || 0);
+    return v.toLocaleString(undefined);
+  };
+
+  const QuestionCard = ({ q }) => {
+    const counts = getOptionCounts(q);
+    const total = Array.isArray(counts)
+      ? counts.reduce((a, b) => a + Number(b || 0), 0)
+      : 0;
+
+    return (
+      <div className="dash-card dash-card--tight" key={q._id || q.text}>
+        <div className="q-head">
+          <h4 className="dash-heading q-title" title={q.text}>
+            {q.text}
+          </h4>
+          <div className="q-actions" role="group" aria-label="Question actions">
+            <button
+              className="btn-icon"
+              title="Refresh aggregates"
+              onClick={onRefresh}
+              aria-label="Refresh"
+            >
+              ⟳
+            </button>
+            <a className="btn-icon" href="#!" title="View details" aria-label="View details">
+              ⓘ
+            </a>
+          </div>
+        </div>
+
+        <div className="q-options">
+          {(q.options || []).map((o, i) => {
+            const label = `${String.fromCharCode(65 + i)}. ${o?.text || "-"}`;
+            const isCorrect =
+              typeof q.correctOptionIndex === "number" &&
+              q.correctOptionIndex === i;
+            return (
+              <span
+                className={`option-chip ${isCorrect ? "option-chip--correct" : ""}`}
+                key={`${q._id}-opt-${i}`}
+                title={isCorrect ? "Correct answer" : undefined}
+              >
+                {label}
+              </span>
+            );
+          })}
+        </div>
+
+        <div className="q-stats">
+          {Array.isArray(counts) ? (
+            <>
+              <span className="stat-pill stat-pill--total" title="Total responses">
+                Total: {numberFmt(total)}
+              </span>
+              {counts.map((c, i) => (
+                <span
+                  key={`${q._id}-cnt-${i}`}
+                  className={`stat-pill ${c > 0 ? "stat-pill--active" : ""}`}
+                  title={`Responses for ${String.fromCharCode(65 + i)}`}
+                >
+                  {String.fromCharCode(65 + i)}: {numberFmt(c)}
+                </span>
+              ))}
+            </>
+          ) : (
+            <span className="muted">No aggregate data</span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="app-container">
       <Header
@@ -146,145 +223,131 @@ export default function Admin() {
         subtitle="Create and review multiple-choice questions"
       />
 
-      <section className="card">
-        <h3 className="section-title">Create a new MCQ</h3>
-        {error ? (
-          <div className="auth-error" style={{ marginTop: 8 }}>
-            {String(error)}
-          </div>
-        ) : null}
-        {success ? (
-          <div
-            role="status"
-            aria-live="polite"
-            style={{
-              background: "rgba(245,158,11,0.10)",
-              color: "#b45309",
-              border: "1px solid rgba(245,158,11,0.25)",
-              borderRadius: 10,
-              padding: "8px 10px",
-              marginTop: 8,
-              fontSize: 14,
-            }}
-          >
-            {success}
-          </div>
-        ) : null}
-        <form className="auth-form" onSubmit={handleSubmit} style={{ marginTop: 8 }}>
-          <label className="auth-label">
-            Question Title
-            <input
-              type="text"
-              className="auth-input"
-              placeholder="Enter the question text"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              required
-            />
-          </label>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
-            {options.map((opt, i) => (
-              <label className="auth-label" key={`opt-${i}`}>
-                Option {String.fromCharCode(65 + i)}
-                <input
-                  type="text"
-                  className="auth-input"
-                  placeholder={`Option ${i + 1}`}
-                  value={opt}
-                  onChange={(e) => updateOption(i, e.target.value)}
-                  required
-                />
-              </label>
-            ))}
+      {/* Responsive grid container */}
+      <section className="grid-dashboard">
+        {/* Create MCQ form card: full width on small, half on md+ */}
+        <div className={`dash-card md-col-span-2 ${animateSuccess ? "card-pulse" : ""}`}>
+          <div className="q-head">
+            <h3 className="dash-heading">Create a new MCQ</h3>
+            <div className="q-actions">
+              <button
+                className="btn-icon"
+                onClick={() => {
+                  resetForm();
+                }}
+                title="Reset form"
+                aria-label="Reset form"
+                type="button"
+              >
+                ↺
+              </button>
+            </div>
           </div>
 
-          <label className="auth-label">
-            Correct Option
-            <select
-              className="auth-input"
-              value={correctIndex}
-              onChange={(e) => setCorrectIndex(Number(e.target.value))}
+          {error ? (
+            <div className="auth-error" style={{ marginTop: 8 }} role="alert">
+              {String(error)}
+            </div>
+          ) : null}
+          {success ? (
+            <div
+              role="status"
+              aria-live="polite"
+              className="inline-toast toast-success"
+              style={{ marginTop: 8 }}
             >
-              {options.map((_, i) => (
-                <option key={`idx-${i}`} value={i}>
-                  {String.fromCharCode(65 + i)}
-                </option>
+              {success}
+            </div>
+          ) : null}
+
+          <form className="auth-form" onSubmit={handleSubmit} style={{ marginTop: 8 }}>
+            <label className="auth-label">
+              Question Title
+              <input
+                type="text"
+                className="auth-input"
+                placeholder="Enter the question text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                required
+              />
+            </label>
+
+            <div className="options-grid">
+              {options.map((opt, i) => (
+                <label className="auth-label" key={`opt-${i}`}>
+                  Option {String.fromCharCode(65 + i)}
+                  <input
+                    type="text"
+                    className="auth-input"
+                    placeholder={`Option ${i + 1}`}
+                    value={opt}
+                    onChange={(e) => updateOption(i, e.target.value)}
+                    required
+                  />
+                </label>
               ))}
-            </select>
-          </label>
+            </div>
 
-          <button
-            type="submit"
-            className="btn-primary auth-submit"
-            disabled={submitting || !isFormValid}
-          >
-            {submitting ? "Creating…" : "Create Question"}
-          </button>
-        </form>
-      </section>
+            <label className="auth-label">
+              Correct Option
+              <select
+                className="auth-input"
+                value={correctIndex}
+                onChange={(e) => setCorrectIndex(Number(e.target.value))}
+              >
+                {options.map((_, i) => (
+                  <option key={`idx-${i}`} value={i}>
+                    {String.fromCharCode(65 + i)}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-      <section className="card">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h3 className="section-title">Existing Questions</h3>
-          <button
-            className="btn-primary"
-            onClick={onRefresh}
-            disabled={loadingList || refreshing}
-            title="Refresh questions"
-          >
-            {loadingList || refreshing ? "Refreshing…" : "Refresh"}
-          </button>
+            <div className="actions-row">
+              <button
+                type="submit"
+                className={`btn-primary auth-submit ${submitting ? "is-loading" : ""}`}
+                disabled={submitting || !isFormValid}
+                aria-busy={submitting ? "true" : "false"}
+              >
+                {submitting ? "Creating…" : "Create Question"}
+              </button>
+              <button
+                type="button"
+                className="btn-link"
+                onClick={onRefresh}
+                disabled={loadingList || refreshing}
+                title="Refresh questions"
+              >
+                {loadingList || refreshing ? "Refreshing…" : "Refresh list"}
+              </button>
+            </div>
+          </form>
         </div>
-        {loadingList ? <div className="muted">Loading questions…</div> : null}
-        {!loadingList && questions.length === 0 ? (
-          <div className="muted">No questions yet.</div>
-        ) : null}
-        {!loadingList && questions.length > 0 ? (
-          <div className="table-scroll">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th style={{ width: "45%" }}>Question</th>
-                  <th>Options</th>
-                  <th>Aggregates</th>
-                </tr>
-              </thead>
-              <tbody>
-                {questions.map((q) => {
-                  const counts = getOptionCounts(q);
-                  return (
-                    <tr key={q._id || q.text}>
-                      <td>{q.text}</td>
-                      <td>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {(q.options || []).map((o, i) => (
-                            <span key={`${q._id}-opt-${i}`} className="pill">
-                              {String.fromCharCode(65 + i)}. {o?.text || "-"}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td>
-                        {Array.isArray(counts) ? (
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            {counts.map((count, i) => (
-                              <span key={`${q._id}-cnt-${i}`} className="pill pill-view">
-                                {String.fromCharCode(65 + i)}: {count}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="muted">No aggregate data</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+
+        {/* Loading/empty states for questions */}
+        {loadingList ? (
+          <div className="dash-card">
+            <div className="skeleton skeleton-text" aria-busy="true">
+              Loading questions…
+            </div>
           </div>
         ) : null}
+
+        {!loadingList && questions.length === 0 ? (
+          <div className="dash-card">
+            <div className="empty-state" role="status" aria-live="polite">
+              <span className="empty-icon" aria-hidden="true">ⓘ</span>
+              <span>No questions yet. Create your first one above.</span>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Questions as cards in responsive grid */}
+        {!loadingList &&
+          questions.length > 0 &&
+          questions.map((q) => <QuestionCard key={q._id || q.text} q={q} />)}
       </section>
 
       <footer className="footer">
