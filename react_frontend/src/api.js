@@ -9,10 +9,16 @@ const defaultSocket =
  * PUBLIC_INTERFACE
  * getApiBaseUrl
  * Resolves the REST API base URL from env or falls back to same origin.
+ * Primary variable: VITE_BACKEND_URL
+ * Backward compatibility fallback: VITE_API_BASE_URL
+ * If neither is set, returns empty string which means "same-origin".
  */
 export function getApiBaseUrl() {
   const env = import.meta?.env;
-  const base = env?.VITE_API_BASE_URL ?? defaultBase;
+  const base =
+    env?.VITE_BACKEND_URL ??
+    env?.VITE_API_BASE_URL ??
+    defaultBase;
   return base || defaultBase;
 }
 

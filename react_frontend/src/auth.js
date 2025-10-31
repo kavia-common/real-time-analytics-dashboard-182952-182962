@@ -71,7 +71,7 @@ export function setStoredUser(user) {
 export async function authFetch(path, options = {}) {
   /**
    * Wrapper around fetch that attaches Authorization: Bearer <token> when available.
-   * Uses same-origin or VITE_API_BASE_URL.
+   * Uses same-origin or VITE_BACKEND_URL, with backward-compatible fallback to VITE_API_BASE_URL.
    */
   const base = getApiBaseUrl();
   const url = path.startsWith("http") ? path : `${base}${path}`;
