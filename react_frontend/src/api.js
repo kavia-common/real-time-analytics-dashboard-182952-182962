@@ -13,54 +13,41 @@ const defaultSocket =
  * Backward compatibility fallback: VITE_API_BASE_URL
  * If neither is set, returns empty string which means "same-origin".
  */
+/**
+ * PUBLIC_INTERFACE
+ * getApiBaseUrl
+ * Resolves the REST API base URL from env or falls back to same origin.
+ */
 export function getApiBaseUrl() {
   const env = import.meta?.env;
-  const base =
-    env?.VITE_BACKEND_URL ??
-    env?.VITE_API_BASE_URL ??
-    defaultBase;
+  
+  // Debug all environment variables
+  console.log('🔧 Environment Variables:', {
+    VITE_BACKEND_URL: env?.VITE_BACKEND_URL,
+    VITE_API_BASE_URL: env?.VITE_API_BASE_URL,
+    MODE: env?.MODE,
+    PROD: env?.PROD,
+    DEV: env?.DEV
+  });
 
-  // Build-time/runtime guard: warn in production if BACKEND_URL missing.
-  try {
-    const isProd = env?.PROD === true || env?.MODE === "production";
-    if (isProd && !env?.VITE_BACKEND_URL) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "[config] VITE_BACKEND_URL is not set in production; frontend will use same-origin for REST calls. Set VITE_BACKEND_URL to your backend URL."
-      );
-    }
-  } catch {
-    // ignore any env access errors
+  // Try to get backend URL from environment variables
+  const backendUrl = env?.VITE_BACKEND_URL || env?.VITE_API_BASE_URL;
+  
+  if (backendUrl) {
+    console.log('🔧 Using backend URL from environment:', backendUrl);
+    return backendUrl;
   }
 
-  return base || defaultBase;
-}
+  // Production fallback - use your actual backend URL
+  if (env?.MODE === 'production' || env?.PROD === true) {
+    const productionBackendUrl = 'https://kavia-alb-fa100ecf-1245176832.backend.kavia.app';
+    console.log('🔧 Using hardcoded production backend URL:', productionBackendUrl);
+    return productionBackendUrl;
+  }
 
-/**
- * PUBLIC_INTERFACE
- * getUsersAnsweredToday
- * Returns { total: number, series: [{ time: ISOString, value: number }], timezone: 'UTC' }.
- */
-export async function getUsersAnsweredToday() {
-  const base = getApiBaseUrl();
-  const url = `${base}/api/metrics/users-answered-today`;
-  const res = await authorizedFetch(url, { method: "GET" });
-  if (!res.ok) throw new Error(`getUsersAnsweredToday failed: ${res.status}`);
-  return res.json();
-}
-
-/**
- * PUBLIC_INTERFACE
- * getEventHeatmap
- * Returns { timezone: 'UTC', buckets: [{ hour: number, dow: number, count: number }], last24h: boolean }.
- * Accepts optional range param: '24h' | '7d' (default 7d).
- */
-export async function getEventHeatmap(range = "7d") {
-  const base = getApiBaseUrl();
-  const url = `${base}/api/metrics/event-heatmap?range=${encodeURIComponent(range)}`;
-  const res = await authorizedFetch(url, { method: "GET" });
-  if (!res.ok) throw new Error(`getEventHeatmap failed: ${res.status}`);
-  return res.json();
+  // Development fallback
+  console.log('🔧 Using default base URL (same origin)');
+  return "";
 }
 
 /**
@@ -90,6 +77,13 @@ export function getSocketUrl() {
 export async function authorizedFetch(url, options = {}) {
   let headers = { ...(options.headers || {}), "Content-Type": "application/json" };
 
+  // Debug logging
+  console.log('🔧 authorizedFetch called:', {
+    url,
+    method: options.method || 'GET',
+    hasAuthHeader: !!headers.Authorization
+  });
+
   // Decide which token to attach based on URL path without referencing global URL/window
   try {
     // Extract pathname safely from absolute or relative URL
@@ -114,27 +108,164 @@ export async function authorizedFetch(url, options = {}) {
       }
     }
 
+    console.log('🔧 Extracted pathname:', pathname);
+
     if (pathname.startsWith("/api/admin")) {
       const adminMod = await import("./adminAuth.js");
       const aToken = adminMod.getAdminToken?.();
       if (aToken) {
         headers = { ...headers, Authorization: `Bearer ${aToken}` };
+        console.log('🔧 Added admin token');
       }
     } else {
       const userMod = await import("./auth.js");
       const uToken = userMod.getToken?.();
       if (uToken) {
         headers = { ...headers, Authorization: `Bearer ${uToken}` };
+        console.log('🔧 Added user token');
       }
     }
-  } catch {
-    // ignore
+  } catch (error) {
+    console.warn('🔧 Token attachment failed:', error);
   }
 
   const f = typeof globalThis !== "undefined" && globalThis.fetch ? globalThis.fetch : null;
   if (!f) throw new Error("fetch is not available in this environment");
-  // Do NOT send credentials (cookies). We rely solely on Bearer tokens for auth.
-  return f(url, { ...options, headers });
+  
+  // FIX: Include credentials for CORS - THIS IS CRITICAL!
+  const fetchOptions = {
+    credentials: "include",  // ← THIS FIXES THE 405 ERROR
+    ...options, 
+    headers 
+  };
+
+  console.log('🔧 Final fetch options:', {
+    url,
+    credentials: fetchOptions.credentials,
+    method: fetchOptions.method,
+    headers: fetchOptions.headers
+  });
+
+  try {
+    const response = await f(url, fetchOptions);
+    
+    console.log('🔧 authorizedFetch response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      url: response.url
+    });
+
+    return response;
+  } catch (error) {
+    console.error('🔧 authorizedFetch error:', error);
+    throw error;
+  }
+}
+
+/**
+ * PUBLIC_INTERFACE
+ * testBackendConnection
+ * Tests backend connectivity and CORS configuration
+ */
+export async function testBackendConnection() {
+  try {
+    const baseUrl = getApiBaseUrl();
+    const testUrl = `${baseUrl}/api/health`;
+    
+    console.log('🔧 Testing backend connection to:', testUrl);
+    console.log('🔧 Using base URL:', baseUrl);
+    
+    const response = await fetch(testUrl, {
+      method: 'GET',
+      credentials: 'include', // Important for CORS!
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    const result = {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      url: testUrl
+    };
+    
+    console.log('🔧 Backend connection test result:', result);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('🔧 Backend error response:', errorText);
+      result.error = errorText;
+    } else {
+      try {
+        const healthData = await response.json();
+        console.log('🔧 Backend health data:', healthData);
+        result.data = healthData;
+      } catch (parseError) {
+        console.warn('🔧 Could not parse health response:', parseError);
+      }
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('🔧 Backend connection test failed:', error);
+    return {
+      ok: false,
+      error: error.message,
+      url: 'Unknown'
+    };
+  }
+}
+
+/**
+ * PUBLIC_INTERFACE
+ * debugEnvironment
+ * Logs current environment configuration for debugging
+ */
+export function debugEnvironment() {
+  const env = import.meta?.env;
+  const config = {
+    VITE_BACKEND_URL: env?.VITE_BACKEND_URL,
+    VITE_API_BASE_URL: env?.VITE_API_BASE_URL,
+    VITE_SOCKET_URL: env?.VITE_SOCKET_URL,
+    MODE: env?.MODE,
+    PROD: env?.PROD,
+    DEV: env?.DEV,
+    baseUrl: getApiBaseUrl(),
+    socketUrl: getSocketUrl(),
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Server'
+  };
+  
+  console.log('🔧 Environment Configuration:', config);
+  return config;
+}
+
+/**
+ * PUBLIC_INTERFACE
+ * getUsersAnsweredToday
+ * Returns { total: number, series: [{ time: ISOString, value: number }], timezone: 'UTC' }.
+ */
+export async function getUsersAnsweredToday() {
+  const base = getApiBaseUrl();
+  const url = `${base}/api/metrics/users-answered-today`;
+  const res = await authorizedFetch(url, { method: "GET" });
+  if (!res.ok) throw new Error(`getUsersAnsweredToday failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * PUBLIC_INTERFACE
+ * getEventHeatmap
+ * Returns { timezone: 'UTC', buckets: [{ hour: number, dow: number, count: number }], last24h: boolean }.
+ * Accepts optional range param: '24h' | '7d' (default 7d).
+ */
+export async function getEventHeatmap(range = "7d") {
+  const base = getApiBaseUrl();
+  const url = `${base}/api/metrics/event-heatmap?range=${encodeURIComponent(range)}`;
+  const res = await authorizedFetch(url, { method: "GET" });
+  if (!res.ok) throw new Error(`getEventHeatmap failed: ${res.status}`);
+  return res.json();
 }
 
 /**

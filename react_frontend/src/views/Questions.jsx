@@ -60,7 +60,6 @@ export default function Questions() {
       const s = io(socketURL, {
         path: "/socket.io",
         transports: ["websocket", "polling"],
-        withCredentials: true,
       });
       socketRef.current = s;
 

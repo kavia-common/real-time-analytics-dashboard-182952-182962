@@ -5,6 +5,28 @@ import AppRouter from "./router.jsx";
 import { getApiBaseUrl } from "./api.js";
 import { getSocketUrl } from "./api.js";
 
+// Startup configuration logging and production warnings
+(() => {
+  try {
+    const env = import.meta?.env || {};
+    const api = getApiBaseUrl();
+    const sock = getSocketUrl();
+    // Log effective URLs
+    // eslint-disable-next-line no-console
+    console.log("[config] Effective API base:", api || "same-origin");
+    // eslint-disable-next-line no-console
+    console.log("[config] Effective Socket base:", sock || "same-origin");
+    // Warn in production if BACKEND_URL is missing
+    const isProd = env?.PROD === true || env?.MODE === "production";
+    if (isProd && !env?.VITE_BACKEND_URL) {
+      // eslint-disable-next-line no-console
+      console.warn("[config] VITE_BACKEND_URL is missing in production; falling back to same-origin for REST calls. Set VITE_BACKEND_URL to your backend URL.");
+    }
+  } catch {
+    // ignore
+  }
+})();
+
 // Simple dev diagnostics banner component
 function DevBanner() {
   useEffect(() => {
