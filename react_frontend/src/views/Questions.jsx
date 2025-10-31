@@ -11,8 +11,9 @@ import { io } from "socket.io-client";
  * Authenticated user MCQ answering page:
  * - Fetches questions from GET /api/questions
  * - Allows selecting an option and submitting via POST /api/answers
- * - After submitting, shows a donut chart of response distribution
- * - Subscribes to Socket.io ("new_answer" or "metrics_update") to update in real time
+ * - After submitting, shows inline Correct/Wrong feedback
+ * - Displays a donut chart with per-option distribution including counts and percentages
+ * - Subscribes to Socket.io for real-time updates without altering existing backend behavior
  */
 export default function Questions() {
   const [questions, setQuestions] = useState([]);
@@ -20,9 +21,8 @@ export default function Questions() {
   const [loadError, setLoadError] = useState("");
   const [selected, setSelected] = useState({}); // { [question_id]: index }
   const [submitting, setSubmitting] = useState({}); // { [question_id]: boolean }
-  const [submitted, setSubmitted] = useState({}); // { [question_id]: boolean }
+  const [feedback, setFeedback] = useState({}); // { [question_id]: 'correct' | 'wrong' | 'error' }
   const [counts, setCounts] = useState({}); // { [question_id]: number[] }
-  const [toast, setToast] = useState(null); // { type: 'success' | 'error', text: string }
   const socketRef = useRef(null);
 
   // Fetch questions
@@ -125,13 +125,11 @@ export default function Questions() {
 
   const handleSelect = (qid, idx) => {
     setSelected((prev) => ({ ...prev, [qid]: idx }));
-  };
-
-  const announce = (type, text) => {
-    setToast({ type, text });
-    // Auto-dismiss after 3 seconds
-    window.clearTimeout(announce._t);
-    announce._t = window.setTimeout(() => setToast(null), 3000);
+    setFeedback((prev) => {
+      const next = { ...prev };
+      delete next[qid];
+      return next;
+    });
   };
 
   const handleSubmit = async (qid) => {
@@ -139,9 +137,9 @@ export default function Questions() {
     if (typeof idx !== "number") return;
     setSubmitting((p) => ({ ...p, [qid]: true }));
     try {
-      await submitAnswer({ question_id: qid, selectedOptionIndex: idx });
-      setSubmitted((p) => ({ ...p, [qid]: true }));
-      announce("success", "Your answer has been submitted.");
+      const res = await submitAnswer({ question_id: qid, selectedOptionIndex: idx });
+      const isCorrect = !!res?.isCorrect;
+      setFeedback((p) => ({ ...p, [qid]: isCorrect ? "correct" : "wrong" }));
       // Optimistic update counts; socket will reconcile
       setCounts((prev) => {
         const question = questions.find((q) => (q._id || q.id || q.text) === qid);
@@ -152,7 +150,7 @@ export default function Questions() {
         return { ...prev, [qid]: next };
       });
     } catch (e) {
-      announce("error", e?.message || "Failed to submit answer");
+      setFeedback((p) => ({ ...p, [qid]: "error" }));
     } finally {
       setSubmitting((p) => ({ ...p, [qid]: false }));
     }
@@ -174,8 +172,11 @@ export default function Questions() {
   const Donut = ({ qid, options }) => {
     const data = useMemo(() => {
       const arr = counts[qid] || [];
-      if (!Array.isArray(arr) || arr.length === 0) return [];
-      return arr.map((count, i) => ({
+      const len = options?.length || arr.length || 0;
+      if (len === 0) return [];
+      // Ensure array length matches options for consistent labels
+      const safeCounts = Array.from({ length: len }, (_, i) => arr[i] || 0);
+      return safeCounts.map((count, i) => ({
         name: `${String.fromCharCode(65 + i)}. ${options?.[i]?.text ?? "Option"}`,
         value: count,
       }));
@@ -280,17 +281,6 @@ export default function Questions() {
     <div className="app-container">
       <Header title="Questions" subtitle="Answer MCQs and see live results" />
 
-      {/* Toast notification */}
-      {toast ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className={`inline-toast ${toast.type === "error" ? "toast-error" : "toast-success"}`}
-        >
-          {toast.text}
-        </div>
-      ) : null}
-
       {loading ? <div className="skeleton skeleton-text" aria-busy="true">Loading questions…</div> : null}
       {loadError ? <div className="auth-error" style={{ margin: "12px 0" }}>{String(loadError)}</div> : null}
       {!loading && questions.length === 0 ? (
@@ -305,7 +295,8 @@ export default function Questions() {
           const qid = getQuestionId(q);
           const chosen = selected[qid];
           const isSubmitting = !!submitting[qid];
-          const isSubmitted = !!submitted[qid];
+          const fb = feedback[qid];
+
           return (
             <div className="dash-card" key={qid} aria-labelledby={`${qid}-title`}>
               <h3 id={`${qid}-title`} className="dash-heading">{q.text}</h3>
@@ -327,7 +318,7 @@ export default function Questions() {
                       label={opt?.text || "-"}
                       selectedIdx={chosen}
                       onSelect={() => handleSelect(qid, idx)}
-                      disabled={isSubmitted}
+                      disabled={false}
                     />
                   );
                 })}
@@ -336,16 +327,29 @@ export default function Questions() {
               <div className="actions-row">
                 <button
                   className="btn-primary"
-                  disabled={typeof chosen !== "number" || isSubmitting || isSubmitted}
+                  disabled={typeof chosen !== "number" || isSubmitting}
                   onClick={() => handleSubmit(qid)}
                   title={user ? `Answer as ${user.username || user.email}` : "Answer"}
                   aria-busy={isSubmitting ? "true" : "false"}
                 >
-                  {isSubmitting ? "Submitting…" : isSubmitted ? "Submitted" : "Submit Answer"}
+                  {isSubmitting ? "Submitting…" : "Submit Answer"}
                 </button>
-                {isSubmitted ? (
-                  <span className="hint muted">Your response was recorded.</span>
-                ) : null}
+
+                {fb === "correct" && (
+                  <span role="status" aria-live="polite" className="inline-toast toast-success">
+                    Correct
+                  </span>
+                )}
+                {fb === "wrong" && (
+                  <span role="status" aria-live="polite" className="inline-toast toast-error">
+                    Wrong
+                  </span>
+                )}
+                {fb === "error" && (
+                  <span role="status" aria-live="polite" className="inline-toast toast-error">
+                    Submission failed
+                  </span>
+                )}
               </div>
 
               <div style={{ marginTop: 12 }}>
