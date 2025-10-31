@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 const defaultBase = "";
 // Guard window access for Node lint/build environments
 const defaultSocket =
@@ -30,20 +29,35 @@ export function getSocketUrl() {
 
 /**
  * PUBLIC_INTERFACE
+ * authorizedFetch
+ * A thin wrapper that attaches Authorization header if auth.js provides a token.
+ */
+export async function authorizedFetch(url, options = {}) {
+  let headers = { ...(options.headers || {}), "Content-Type": "application/json" };
+  try {
+    // Lazy import to avoid circular dep
+    const mod = await import("./auth.js");
+    const token = mod.getToken?.();
+    if (token) {
+      headers = { ...headers, Authorization: `Bearer ${token}` };
+    }
+  } catch {
+    // ignore
+  }
+  const f = typeof globalThis !== "undefined" && globalThis.fetch ? globalThis.fetch : null;
+  if (!f) throw new Error("fetch is not available in this environment");
+  return f(url, { credentials: "include", ...options, headers });
+}
+
+/**
+ * PUBLIC_INTERFACE
  * getEvents
  * Fetches the latest events from GET /api/events.
  */
 export async function getEvents() {
   const base = getApiBaseUrl();
   const url = `${base}/api/events`;
-  const f = typeof globalThis !== "undefined" && globalThis.fetch ? globalThis.fetch : null;
-  if (!f) {
-    throw new Error("fetch is not available in this environment");
-  }
-  const res = await f(url, {
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-  });
+  const res = await authorizedFetch(url, {});
   if (!res.ok) {
     throw new Error(`getEvents failed: ${res.status}`);
   }
@@ -58,15 +72,9 @@ export async function getEvents() {
 export async function createEvent(payload) {
   const base = getApiBaseUrl();
   const url = `${base}/api/events`;
-  const f = typeof globalThis !== "undefined" && globalThis.fetch ? globalThis.fetch : null;
-  if (!f) {
-    throw new Error("fetch is not available in this environment");
-  }
-  const res = await f(url, {
+  const res = await authorizedFetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    credentials: "include",
   });
   if (!res.ok) {
     throw new Error(`createEvent failed: ${res.status}`);
