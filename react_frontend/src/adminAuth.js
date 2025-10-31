@@ -91,8 +91,8 @@ export async function adminAuthFetch(path, options = {}) {
       : null;
   if (!f) throw new Error("fetch is not available in this environment");
 
+  // Do NOT include credentials (cookies); admin APIs are Bearer-only.
   const res = await f(url, {
-    credentials: "include",
     ...options,
     headers,
   });

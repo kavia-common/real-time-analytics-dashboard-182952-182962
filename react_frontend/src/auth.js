@@ -88,8 +88,8 @@ export async function authFetch(path, options = {}) {
   const f = typeof globalThis !== "undefined" && globalThis.fetch ? globalThis.fetch : null;
   if (!f) throw new Error("fetch is not available in this environment");
 
+  // Do NOT include credentials (cookies); use Bearer token only to simplify CORS.
   const res = await f(url, {
-    credentials: "include",
     ...options,
     headers,
   });

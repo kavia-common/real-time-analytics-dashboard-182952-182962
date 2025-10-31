@@ -111,7 +111,8 @@ export async function authorizedFetch(url, options = {}) {
 
   const f = typeof globalThis !== "undefined" && globalThis.fetch ? globalThis.fetch : null;
   if (!f) throw new Error("fetch is not available in this environment");
-  return f(url, { credentials: "include", ...options, headers });
+  // Do NOT send credentials (cookies). We rely solely on Bearer tokens for auth.
+  return f(url, { ...options, headers });
 }
 
 /**
