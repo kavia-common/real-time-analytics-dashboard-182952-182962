@@ -19,6 +19,20 @@ export function getApiBaseUrl() {
     env?.VITE_BACKEND_URL ??
     env?.VITE_API_BASE_URL ??
     defaultBase;
+
+  // Build-time/runtime guard: warn in production if BACKEND_URL missing.
+  try {
+    const isProd = env?.PROD === true || env?.MODE === "production";
+    if (isProd && !env?.VITE_BACKEND_URL) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[config] VITE_BACKEND_URL is not set in production; frontend will use same-origin for REST calls. Set VITE_BACKEND_URL to your backend URL."
+      );
+    }
+  } catch {
+    // ignore any env access errors
+  }
+
   return base || defaultBase;
 }
 
@@ -52,12 +66,20 @@ export async function getEventHeatmap(range = "7d") {
 /**
  * PUBLIC_INTERFACE
  * getSocketUrl
- * Resolves the Socket.io server URL from env or falls back to same origin.
+ * Resolves the Socket.io server URL with priority:
+ * - VITE_SOCKET_URL
+ * - VITE_BACKEND_URL
+ * - same-origin (window.location.origin)
  */
 export function getSocketUrl() {
   const env = import.meta?.env;
-  const base = env?.VITE_SOCKET_URL ?? defaultSocket;
-  return base || defaultSocket;
+  const socket = env?.VITE_SOCKET_URL;
+  if (socket && String(socket).trim() !== "") return socket;
+
+  const backend = env?.VITE_BACKEND_URL ?? env?.VITE_API_BASE_URL ?? "";
+  if (backend && String(backend).trim() !== "") return backend;
+
+  return defaultSocket;
 }
 
 /**
