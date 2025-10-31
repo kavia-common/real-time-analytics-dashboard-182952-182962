@@ -8,6 +8,8 @@ import {
   getSignupsPerDay,
   getTotalEvents,
   getSocketUrl,
+  getUsersAnsweredToday,
+  getEventHeatmap,
 } from "../api.js";
 import { getStoredUser } from "../auth.js";
 import {
@@ -48,6 +50,10 @@ export default function Dashboard() {
   const [recentActivity, setRecentActivity] = useState([]); // events array
   const [activeWindow, setActiveWindow] = useState("10m");
 
+  // New widgets' state
+  const [usersAnsweredToday, setUsersAnsweredToday] = useState({ total: 0, series: [], timezone: "UTC" });
+  const [heatmap, setHeatmap] = useState({ buckets: [], timezone: "UTC", last24h: false });
+
   const socketRef = useRef(null);
   const user = getStoredUser();
 
@@ -57,12 +63,14 @@ export default function Dashboard() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [total, types, signups, active, recent] = await Promise.allSettled([
+      const [total, types, signups, active, recent, usersToday, heatmapData] = await Promise.allSettled([
         getTotalEvents(),
         getEventTypeDistribution(),
         getSignupsPerDay(),
         getActiveUsers(activeWindow),
         getRecentActivity(),
+        getUsersAnsweredToday(),
+        getEventHeatmap("7d"),
       ]);
       const errs = {};
 
@@ -96,6 +104,28 @@ export default function Dashboard() {
         errs.recent = recent.reason?.message || "Failed recent activity";
       }
 
+      if (usersToday.status === "fulfilled") {
+        const v = usersToday.value || {};
+        setUsersAnsweredToday({
+          total: Number(v.total || 0),
+          series: Array.isArray(v.series) ? v.series : [],
+          timezone: v.timezone || "UTC",
+        });
+      } else {
+        errs.usersToday = usersToday.reason?.message || "Failed users answered today";
+      }
+
+      if (heatmapData.status === "fulfilled") {
+        const v = heatmapData.value || {};
+        setHeatmap({
+          buckets: Array.isArray(v.buckets) ? v.buckets : [],
+          timezone: v.timezone || "UTC",
+          last24h: !!v.last24h,
+        });
+      } else {
+        errs.heatmap = heatmapData.reason?.message || "Failed event heatmap";
+      }
+
       setErrors(errs);
     } finally {
       setLoading(false);
@@ -122,16 +152,34 @@ export default function Dashboard() {
         // lightweight refresh: pull total, event types, recent and active users
         (async () => {
           try {
-            const [total, types, active, recent] = await Promise.allSettled([
+            const [total, types, active, recent, usersToday, heatmapData] = await Promise.allSettled([
               getTotalEvents(),
               getEventTypeDistribution(),
               getActiveUsers(activeWindow),
               getRecentActivity(),
+              getUsersAnsweredToday(),
+              getEventHeatmap(heatmap?.last24h ? "24h" : "7d"),
             ]);
             if (total.status === "fulfilled") setTotalEvents(Number(total.value?.total || 0));
             if (types.status === "fulfilled") setEventTypes(Array.isArray(types.value) ? types.value : []);
             if (active.status === "fulfilled") setActiveUsers(Array.isArray(active.value) ? active.value : []);
             if (recent.status === "fulfilled") setRecentActivity(Array.isArray(recent.value) ? recent.value : []);
+            if (usersToday.status === "fulfilled") {
+              const v = usersToday.value || {};
+              setUsersAnsweredToday({
+                total: Number(v.total || 0),
+                series: Array.isArray(v.series) ? v.series : [],
+                timezone: v.timezone || "UTC",
+              });
+            }
+            if (heatmapData.status === "fulfilled") {
+              const v = heatmapData.value || {};
+              setHeatmap({
+                buckets: Array.isArray(v.buckets) ? v.buckets : [],
+                timezone: v.timezone || "UTC",
+                last24h: !!v.last24h,
+              });
+            }
           } catch {
             // ignore one-off refresh errors
           }
@@ -181,6 +229,28 @@ export default function Dashboard() {
     arr.sort((a, b) => String(a.minute).localeCompare(String(b.minute)));
     return arr;
   }, [activeUsers]);
+
+  // Users Answered Today series chart data
+  const usersAnsweredSeries = useMemo(() => {
+    const arr = Array.isArray(usersAnsweredToday?.series) ? [...usersAnsweredToday.series] : [];
+    arr.sort((a, b) => String(a.time).localeCompare(String(b.time)));
+    return arr.map((p) => ({ time: p.time, value: Number(p.value || 0) }));
+  }, [usersAnsweredToday]);
+
+  // Heatmap matrix transform: dow (0-6) vs hour (0-23)
+  const heatmapMatrix = useMemo(() => {
+    const buckets = Array.isArray(heatmap?.buckets) ? heatmap.buckets : [];
+    // Create 7 x 24 matrix initialized with 0
+    const matrix = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
+    for (const b of buckets) {
+      const h = Number(b?.hour ?? -1);
+      const d = Number(b?.dow ?? -1);
+      if (h >= 0 && h < 24 && d >= 0 && d < 7) {
+        matrix[d][h] = Number(b.count || 0);
+      }
+    }
+    return matrix;
+  }, [heatmap]);
 
   const TotalCounter = ({ total }) => {
     const [animate, setAnimate] = useState(false);
@@ -275,6 +345,107 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
           )}
+        </div>
+      </section>
+
+      <section className="cards dashboard-grid" aria-label="Realtime engagement">
+        <div className="card" aria-label="Users who answered today">
+          <h3 className="section-title">Users Answered Today</h3>
+          <p className="section-subtitle">Unique users who submitted answers today (UTC)</p>
+          <div className="live-counter" role="status" aria-live="polite" aria-label="Users answered today total">
+            <div className="live-counter-number">{Number(usersAnsweredToday?.total || 0)}</div>
+            <div className="live-counter-label">Total (today)</div>
+          </div>
+          <div style={{ width: "100%", height: 220, marginTop: 10 }}>
+            {usersAnsweredSeries.length === 0 ? (
+              <div className="empty-state" role="status" aria-live="polite">
+                <span className="empty-icon" aria-hidden="true">ⓘ</span>
+                <span>No data yet</span>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={usersAnsweredSeries} margin={{ top: 10, right: 16, left: 0, bottom: 0 }} role="img" aria-label="Users answered today per minute">
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
+                  <XAxis dataKey="time" stroke="#111827" />
+                  <YAxis allowDecimals={false} stroke="#111827" />
+                  <Tooltip labelFormatter={(label) => `Time: ${label}`} formatter={(value) => [`${value} users`, "Unique Users"]} />
+                  <Line type="monotone" dataKey="value" name="Unique Users" stroke="var(--color-secondary)" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        <div className="card" aria-label="Event heatmap">
+          <h3 className="section-title">Event Heatmap</h3>
+          <p className="section-subtitle">Events by day of week and hour (UTC)</p>
+          <div className="control-row">
+            <span className="muted">Range</span>
+            <div className="segmented">
+              {[
+                { key: "24h", label: "Last 24h" },
+                { key: "7d", label: "Last 7d" },
+              ].map((r) => (
+                <button
+                  key={r.key}
+                  className={`segmented-btn ${heatmap?.last24h ? (r.key === "24h" ? "active" : "") : (r.key === "7d" ? "active" : "")}`}
+                  onClick={async () => {
+                    try {
+                      const v = await getEventHeatmap(r.key);
+                      setHeatmap({
+                        buckets: Array.isArray(v?.buckets) ? v.buckets : [],
+                        timezone: v?.timezone || "UTC",
+                        last24h: r.key === "24h",
+                      });
+                    } catch {
+                      // keep existing
+                    }
+                  }}
+                  aria-pressed={heatmap?.last24h ? r.key === "24h" : r.key === "7d"}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ width: "100%", overflowX: "auto", marginTop: 10 }}>
+            {heatmapMatrix.flat().length === 0 ? (
+              <div className="empty-state" role="status" aria-live="polite">
+                <span className="empty-icon" aria-hidden="true">ⓘ</span>
+                <span>No data yet</span>
+              </div>
+            ) : (
+              <div role="img" aria-label="Heatmap grid (rows: days Su-Sa, columns: hours 0-23)" style={{ display: "inline-block", borderRadius: 12, overflow: "hidden", border: "1px solid #e5e7eb" }}>
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(25, 28px)` }}>
+                  {/* Header row */}
+                  <div style={{ background: "#f3f4f6", fontSize: 11, padding: 6, textAlign: "center" }}>D/H</div>
+                  {Array.from({ length: 24 }).map((_, h) => (
+                    <div key={`h-${h}`} style={{ background: "#f3f4f6", fontSize: 11, padding: 6, textAlign: "center" }}>{h}</div>
+                  ))}
+                  {/* Rows for days 0-6 */}
+                  {["Su","Mo","Tu","We","Th","Fr","Sa"].map((dLabel, d) => (
+                    <React.Fragment key={`row-${d}`}>
+                      <div style={{ background: "#f3f4f6", fontSize: 11, padding: 6, textAlign: "center" }}>{dLabel}</div>
+                      {Array.from({ length: 24 }).map((_, h) => {
+                        const val = heatmapMatrix?.[d]?.[h] ?? 0;
+                        // color scale based on value
+                        const max = 10; // simple cap for shading
+                        const intensity = Math.min(1, val / max);
+                        const bg = `rgba(37,99,235,${0.1 + intensity * 0.5})`;
+                        return (
+                          <div
+                            key={`cell-${d}-${h}`}
+                            title={`Day ${dLabel}, Hour ${h}: ${val}`}
+                            style={{ width: 28, height: 24, background: val === 0 ? "#eef2ff" : bg, border: "1px solid rgba(17,24,39,0.06)" }}
+                          />
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </section>
 

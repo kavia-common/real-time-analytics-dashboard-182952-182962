@@ -18,6 +18,33 @@ export function getApiBaseUrl() {
 
 /**
  * PUBLIC_INTERFACE
+ * getUsersAnsweredToday
+ * Returns { total: number, series: [{ time: ISOString, value: number }], timezone: 'UTC' }.
+ */
+export async function getUsersAnsweredToday() {
+  const base = getApiBaseUrl();
+  const url = `${base}/api/metrics/users-answered-today`;
+  const res = await authorizedFetch(url, { method: "GET" });
+  if (!res.ok) throw new Error(`getUsersAnsweredToday failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * PUBLIC_INTERFACE
+ * getEventHeatmap
+ * Returns { timezone: 'UTC', buckets: [{ hour: number, dow: number, count: number }], last24h: boolean }.
+ * Accepts optional range param: '24h' | '7d' (default 7d).
+ */
+export async function getEventHeatmap(range = "7d") {
+  const base = getApiBaseUrl();
+  const url = `${base}/api/metrics/event-heatmap?range=${encodeURIComponent(range)}`;
+  const res = await authorizedFetch(url, { method: "GET" });
+  if (!res.ok) throw new Error(`getEventHeatmap failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * PUBLIC_INTERFACE
  * getSocketUrl
  * Resolves the Socket.io server URL from env or falls back to same origin.
  */
