@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import App from "./App.jsx";
 import Login from "./views/Login.jsx";
 import Signup from "./views/Signup.jsx";
+import Admin from "./views/Admin.jsx";
 import { getToken, getCurrentUser, getStoredUser, setStoredUser, clearAuth } from "./auth.js";
 
 /**
@@ -110,16 +111,14 @@ export default function AppRouter() {
           }
         />
 
-        {/* Example admin route placeholder:
         <Route
           path="/admin"
           element={
             <AdminRoute>
-              <AdminPage />
+              <Admin />
             </AdminRoute>
           }
         />
-        */}
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
