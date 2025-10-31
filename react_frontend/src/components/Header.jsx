@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getStoredUser, getCurrentUser, logout } from "../auth.js";
+import { getStoredAdminUser, getCurrentAdmin, adminLogout } from "../adminAuth.js";
 
 /**
  * PUBLIC_INTERFACE
@@ -8,6 +9,7 @@ import { getStoredUser, getCurrentUser, logout } from "../auth.js";
  */
 export default function Header({ title, subtitle }) {
   const [user, setUser] = useState(() => getStoredUser());
+  const [adminUser, setAdminUser] = useState(() => getStoredAdminUser());
   const [loading, setLoading] = useState(false);
 
   // Sync with storage changes across tabs
@@ -18,6 +20,13 @@ export default function Header({ title, subtitle }) {
           setUser(e.newValue ? JSON.parse(e.newValue) : null);
         } catch {
           setUser(null);
+        }
+      }
+      if (e.key === "admin_auth_user") {
+        try {
+          setAdminUser(e.newValue ? JSON.parse(e.newValue) : null);
+        } catch {
+          setAdminUser(null);
         }
       }
     };
@@ -33,19 +42,21 @@ export default function Header({ title, subtitle }) {
 
   // Best-effort fetch user if not cached (valid token assumed by ProtectedRoute)
   useEffect(() => {
-    if (!user) {
-      (async () => {
-        setLoading(true);
-        try {
-          const me = await getCurrentUser();
-          setUser(me);
-        } catch {
-          // ignore
-        } finally {
-          setLoading(false);
+    (async () => {
+      setLoading(true);
+      try {
+        if (!user) {
+          const me = await getCurrentUser().catch(() => null);
+          if (me) setUser(me);
         }
-      })();
-    }
+        if (!adminUser) {
+          const adm = await getCurrentAdmin().catch(() => null);
+          if (adm) setAdminUser(adm);
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []); // run once
 
   const handleLogout = async () => {
@@ -54,6 +65,18 @@ export default function Header({ title, subtitle }) {
     try {
       if (typeof window !== "undefined") {
         window.location.href = "/login";
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleAdminLogout = async () => {
+    await adminLogout();
+    setAdminUser(null);
+    try {
+      if (typeof window !== "undefined") {
+        window.location.href = "/admin/login";
       }
     } catch {
       // ignore
@@ -69,21 +92,39 @@ export default function Header({ title, subtitle }) {
       <div className="header-user" style={{ gap: 16 }}>
         <a className="btn-link" href="/">Dashboard</a>
         {user ? <a className="btn-link" href="/questions">Questions</a> : null}
+        <a className="btn-link" href="/admin">Admin</a>
         {loading ? (
           <span className="muted">Loading…</span>
-        ) : user ? (
-          <div className="user-menu">
-            <div className="avatar">{user?.username?.[0]?.toUpperCase() || "U"}</div>
-            <div className="user-info">
-              <div className="user-name">
-                {user?.username || user?.email || "User"}{" "}
-                {user?.role === "admin" ? <span className="pill pill-view" style={{ marginLeft: 6 }}>ADMIN</span> : null}
-              </div>
-              <button className="btn-link" onClick={handleLogout} title="Logout">Logout</button>
-            </div>
-          </div>
         ) : (
-          <a className="btn-link" href="/login">Login</a>
+          <>
+            {user ? (
+              <div className="user-menu">
+                <div className="avatar">{user?.username?.[0]?.toUpperCase() || "U"}</div>
+                <div className="user-info">
+                  <div className="user-name">
+                    {user?.username || user?.email || "User"}
+                  </div>
+                  <button className="btn-link" onClick={handleLogout} title="Logout">Logout</button>
+                </div>
+              </div>
+            ) : (
+              <a className="btn-link" href="/login">Login</a>
+            )}
+            {adminUser ? (
+              <div className="user-menu">
+                <div className="avatar">{adminUser?.username?.[0]?.toUpperCase() || "A"}</div>
+                <div className="user-info">
+                  <div className="user-name">
+                    {adminUser?.username || adminUser?.email || "Admin"}{" "}
+                    <span className="pill pill-view" style={{ marginLeft: 6 }}>ADMIN</span>
+                  </div>
+                  <button className="btn-link" onClick={handleAdminLogout} title="Logout admin">Admin Logout</button>
+                </div>
+              </div>
+            ) : (
+              <a className="btn-link" href="/admin/login">Admin Login</a>
+            )}
+          </>
         )}
       </div>
     </header>

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Header from "../components/Header.jsx";
-import { authFetch } from "../auth.js";
+import { adminAuthFetch } from "../adminAuth.js";
+import { authorizedFetch } from "../api.js";
 
 /**
  * PUBLIC_INTERFACE
@@ -62,7 +63,8 @@ export default function Admin() {
     setLoadingList(true);
     setError("");
     try {
-      const res = await authFetch("/api/questions", { method: "GET" });
+      // Public listing does not require admin; use generic authorizedFetch (no token needed)
+      const res = await authorizedFetch("/api/questions", { method: "GET" });
       if (!res.ok) {
         const t = await res.text().catch(() => "");
         throw new Error(t || `Failed to fetch questions: ${res.status}`);
@@ -112,7 +114,7 @@ export default function Admin() {
         })), // A, B, C, D
         correctOptionIndex: Number(correctIndex),
       };
-      const res = await authFetch("/api/questions", {
+      const res = await adminAuthFetch("/api/questions", {
         method: "POST",
         body: JSON.stringify(payload),
       });

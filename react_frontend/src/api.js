@@ -34,16 +34,48 @@ export function getSocketUrl() {
  */
 export async function authorizedFetch(url, options = {}) {
   let headers = { ...(options.headers || {}), "Content-Type": "application/json" };
+
+  // Decide which token to attach based on URL path without referencing global URL/window
   try {
-    // Lazy import to avoid circular dep
-    const mod = await import("./auth.js");
-    const token = mod.getToken?.();
-    if (token) {
-      headers = { ...headers, Authorization: `Bearer ${token}` };
+    // Extract pathname safely from absolute or relative URL
+    let pathname = "";
+    if (typeof url === "string") {
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        // Absolute URL: find the first slash after protocol and hostname
+        // e.g., https://host:port/path?query -> extract /path...
+        const idxProto = url.indexOf("://");
+        if (idxProto !== -1) {
+          const afterProto = url.slice(idxProto + 3);
+          const slashIdx = afterProto.indexOf("/");
+          if (slashIdx !== -1) {
+            pathname = afterProto.slice(slashIdx);
+          } else {
+            pathname = "/";
+          }
+        }
+      } else {
+        // Relative URL: ensure it begins with /
+        pathname = url.startsWith("/") ? url : `/${url}`;
+      }
+    }
+
+    if (pathname.startsWith("/api/admin")) {
+      const adminMod = await import("./adminAuth.js");
+      const aToken = adminMod.getAdminToken?.();
+      if (aToken) {
+        headers = { ...headers, Authorization: `Bearer ${aToken}` };
+      }
+    } else {
+      const userMod = await import("./auth.js");
+      const uToken = userMod.getToken?.();
+      if (uToken) {
+        headers = { ...headers, Authorization: `Bearer ${uToken}` };
+      }
     }
   } catch {
     // ignore
   }
+
   const f = typeof globalThis !== "undefined" && globalThis.fetch ? globalThis.fetch : null;
   if (!f) throw new Error("fetch is not available in this environment");
   return f(url, { credentials: "include", ...options, headers });
