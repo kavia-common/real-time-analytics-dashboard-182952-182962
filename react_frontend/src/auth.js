@@ -159,9 +159,12 @@ export async function getCurrentUser() {
   return data?.user ?? data;
 }
 
-// PUBLIC_INTERFACE
+/**
+ * PUBLIC_INTERFACE
+ * logout
+ * Clears token and user client-side and returns true.
+ */
 export async function logout() {
-  /** Clears token and user client-side. */
   clearAuth();
   return true;
 }

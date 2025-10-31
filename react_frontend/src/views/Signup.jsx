@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import { signup } from "../auth.js";
 
-// PUBLIC_INTERFACE
+/**
+ * PUBLIC_INTERFACE
+ * Signup
+ * Signup page for new users. On success, redirects to dashboard.
+ */
 export default function Signup() {
-  /** Signup page for new users. On success, redirects to dashboard. */
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,7 +34,7 @@ export default function Signup() {
       <div className="auth-card">
         <h2 className="auth-title">Create your account</h2>
         <p className="auth-subtitle">Get started with real-time insights</p>
-        {error ? <div className="auth-error">{error}</div> : null}
+        {error ? <div className="auth-error">{String(error)}</div> : null}
         <form onSubmit={onSubmit} className="auth-form">
           <label className="auth-label">
             Username
@@ -61,14 +64,14 @@ export default function Signup() {
             <input
               type="password"
               className="auth-input"
-              placeholder="Create a strong password"
+              placeholder="At least 8 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </label>
           <button className="btn-primary auth-submit" type="submit" disabled={submitting}>
-            {submitting ? "Creating..." : "Create Account"}
+            {submitting ? "Creating…" : "Create Account"}
           </button>
         </form>
         <div className="auth-alt">

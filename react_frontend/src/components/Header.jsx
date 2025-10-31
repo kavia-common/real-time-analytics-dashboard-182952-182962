@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getStoredUser, getCurrentUser, logout, clearAuth } from "../auth.js";
+import { getStoredUser, getCurrentUser, logout } from "../auth.js";
 
 /**
  * PUBLIC_INTERFACE
@@ -9,30 +9,48 @@ import { getStoredUser, getCurrentUser, logout, clearAuth } from "../auth.js";
 export default function Header({ title, subtitle }) {
   const [user, setUser] = useState(() => getStoredUser());
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
+  // Sync with storage changes across tabs
   useEffect(() => {
-    // Try to refresh user from backend if token exists and no user cached
+    const onStorage = (e) => {
+      if (e.key === "auth_user") {
+        try {
+          setUser(e.newValue ? JSON.parse(e.newValue) : null);
+        } catch {
+          setUser(null);
+        }
+      }
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", onStorage);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", onStorage);
+      }
+    };
+  }, []);
+
+  // Best-effort fetch user if not cached (valid token assumed by ProtectedRoute)
+  useEffect(() => {
     if (!user) {
       (async () => {
         setLoading(true);
         try {
           const me = await getCurrentUser();
           setUser(me);
-          setError("");
-        } catch (e) {
-          setError("");
+        } catch {
+          // ignore
         } finally {
           setLoading(false);
         }
       })();
     }
-  }, []);
+  }, []); // run once
 
   const handleLogout = async () => {
     await logout();
     setUser(null);
-    // Best-effort hard redirect to login
     try {
       if (typeof window !== "undefined") {
         window.location.href = "/login";
@@ -50,17 +68,18 @@ export default function Header({ title, subtitle }) {
       </div>
       <div className="header-user">
         {loading ? (
-          <span className="muted">Loading...</span>
+          <span className="muted">Loading…</span>
         ) : user ? (
           <div className="user-menu">
             <div className="avatar">{user?.username?.[0]?.toUpperCase() || "U"}</div>
             <div className="user-info">
-              <div className="user-name">{user?.username || user?.email || "User"}</div>
+              <div className="user-name">
+                {user?.username || user?.email || "User"}{" "}
+                {user?.role === "admin" ? <span className="pill pill-view" style={{ marginLeft: 6 }}>ADMIN</span> : null}
+              </div>
               <button className="btn-link" onClick={handleLogout} title="Logout">Logout</button>
             </div>
           </div>
-        ) : error ? (
-          <span className="muted">{error}</span>
         ) : (
           <a className="btn-link" href="/login">Login</a>
         )}

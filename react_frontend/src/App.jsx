@@ -5,6 +5,7 @@ import LiveCounter from "./components/LiveCounter.jsx";
 import EventsBarChart from "./components/EventsBarChart.jsx";
 import EventsTable from "./components/EventsTable.jsx";
 import { getEvents, createEvent, getApiBaseUrl, getSocketUrl } from "./api.js";
+import { getStoredUser } from "./auth.js";
 
 /**
  * PUBLIC_INTERFACE
@@ -120,12 +121,16 @@ export default function App() {
   const apiBase = getApiBaseUrl();
   const socketBase = getSocketUrl();
 
+  const currentUser = getStoredUser();
   return (
     <div className="app-container">
       <Header title="Real-time Analytics Dashboard" subtitle="Live user events stream" />
       <div className="meta">
-        <span className="meta-item">API: {apiBase}</span>
-        <span className="meta-item">Socket: {socketBase}</span>
+        <span className="meta-item">API: {apiBase || "same-origin"}</span>
+        <span className="meta-item">Socket: {socketBase || "same-origin"}</span>
+        {currentUser ? (
+          <span className="meta-item">Signed in as: {currentUser.username || currentUser.email}</span>
+        ) : null}
       </div>
 
       <section className="cards">

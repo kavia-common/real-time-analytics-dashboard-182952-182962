@@ -1,13 +1,29 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { login } from "../auth.js";
+import { useLocation } from "react-router-dom";
 
-// PUBLIC_INTERFACE
+/**
+ * PUBLIC_INTERFACE
+ * Login
+ * Login page for existing users. On success, redirects to dashboard.
+ */
 export default function Login() {
-  /** Login page for existing users. On success, redirects to dashboard. */
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const location = useLocation();
+
+  useEffect(() => {
+    // Surface error from ProtectedRoute redirect (e.g., expired token)
+    if (location?.state?.error) {
+      setError(location.state.error);
+      // Clean up history state to avoid sticky message on refresh
+      if (typeof window !== "undefined") {
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [location?.state?.error]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -30,7 +46,7 @@ export default function Login() {
       <div className="auth-card">
         <h2 className="auth-title">Welcome back</h2>
         <p className="auth-subtitle">Sign in to continue to your dashboard</p>
-        {error ? <div className="auth-error">{error}</div> : null}
+        {error ? <div className="auth-error">{String(error)}</div> : null}
         <form onSubmit={onSubmit} className="auth-form">
           <label className="auth-label">
             Email
@@ -56,7 +72,7 @@ export default function Login() {
             />
           </label>
           <button className="btn-primary auth-submit" type="submit" disabled={submitting}>
-            {submitting ? "Signing in..." : "Sign In"}
+            {submitting ? "Signing in…" : "Sign In"}
           </button>
         </form>
         <div className="auth-alt">
