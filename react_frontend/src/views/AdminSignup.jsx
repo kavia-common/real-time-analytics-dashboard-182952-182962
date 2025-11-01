@@ -48,7 +48,7 @@ export default function AdminSignup() {
       <div className="auth-blob one" aria-hidden="true" />
       <div className="auth-blob two" aria-hidden="true" />
 
-      <div className="auth-card auth-card--large glass-card card-appear" role="region" aria-label="Admin signup form">
+      <div className="auth-card auth-card--large auth-card--taller glass-card card-appear" role="region" aria-label="Admin signup form">
         <div className="auth-header">
           <div className="auth-icon" aria-hidden="true">💼</div>
           <div>

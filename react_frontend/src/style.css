@@ -966,10 +966,43 @@ body {
   overflow: hidden;
 }
 
+/* Taller auth card utilities */
+:root {
+  /* utilities for auth card sizing */
+  --auth-min-h-sm: 520px;   /* very small screens */
+  --auth-min-h: 640px;      /* base */
+  --auth-min-h-lg: 700px;   /* >=768px */
+  --auth-pad-y: 32px;       /* matches 2rem */
+  --auth-pad-y-lg: 40px;    /* slightly larger on md+ */
+}
+
 /* Glassmorphism utilities and larger card variant for auth */
 .auth-card--large {
   max-width: 560px; /* increase width */
   padding: 32px;
+}
+
+/* New taller modifier - composes with .auth-card--large and .glass-card */
+.auth-card--taller {
+  min-height: var(--auth-min-h);
+  padding-top: var(--auth-pad-y);
+  padding-bottom: var(--auth-pad-y);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Responsive adjustments for taller card */
+@media (max-width: 380px) {
+  .auth-card--taller {
+    min-height: var(--auth-min-h-sm);
+  }
+}
+@media (min-width: 768px) {
+  .auth-card--taller {
+    min-height: var(--auth-min-h-lg);
+    padding-top: var(--auth-pad-y-lg);
+    padding-bottom: var(--auth-pad-y-lg);
+  }
 }
 
 .glass-card,

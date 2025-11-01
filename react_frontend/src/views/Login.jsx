@@ -110,7 +110,7 @@ export default function Login() {
       <div className="auth-blob one" aria-hidden="true" />
       <div className="auth-blob two" aria-hidden="true" />
 
-      <div className="auth-card auth-card--large glass-card card-appear" role="main" aria-label="User sign in">
+      <div className="auth-card auth-card--large auth-card--taller glass-card card-appear" role="main" aria-label="User sign in">
         <div className="auth-header">
           <div className="auth-icon" aria-hidden="true">🔐</div>
           <div>
