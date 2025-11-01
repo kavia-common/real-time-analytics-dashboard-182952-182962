@@ -18,6 +18,59 @@ export function getApiBaseUrl() {
 
 /**
  * PUBLIC_INTERFACE
+ * testBackendConnection
+ * Performs a lightweight GET /health (or /) to verify backend reachability.
+ * Returns { ok: boolean, status?: number, error?: string }.
+ */
+export async function testBackendConnection() {
+  try {
+    const base = getApiBaseUrl();
+    const healthUrls = [`${base}/health`, `${base}/`];
+    const f = typeof globalThis !== "undefined" && globalThis.fetch ? globalThis.fetch : null;
+    if (!f) return { ok: false, error: "fetch not available" };
+    for (const u of healthUrls) {
+      try {
+        const res = await f(u, { method: "GET", credentials: "include" });
+        if (res.ok || res.status === 200) {
+          return { ok: true, status: res.status };
+        }
+      } catch {
+        // try next
+      }
+    }
+    return { ok: false, error: "All health checks failed" };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
+/**
+ * PUBLIC_INTERFACE
+ * debugEnvironment
+ * Logs a small diagnostics bundle in dev to help understand API base resolution.
+ */
+export function debugEnvironment() {
+  try {
+    if (import.meta?.env?.MODE !== "production") {
+      const env = import.meta?.env || {};
+      const diag = {
+        VITE_API_BASE_URL: env.VITE_API_BASE_URL,
+        VITE_SOCKET_URL: env.VITE_SOCKET_URL,
+        MODE: env.MODE,
+        DEV: env.DEV,
+        PROD: env.PROD,
+        baseResolved: getApiBaseUrl(),
+        socketResolved: getSocketUrl(),
+      };
+      globalThis?.console?.log?.("[API Debug] env diagnostics:", diag);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * PUBLIC_INTERFACE
  * getUsersAnsweredToday
  * Returns { total: number, series: [{ time: ISOString, value: number }], timezone: 'UTC' }.
  */

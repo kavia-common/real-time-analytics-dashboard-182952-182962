@@ -1,25 +1,24 @@
-//
+﻿//
 // PUBLIC_INTERFACE
 // Auth utilities: token storage, current user fetch, and API helpers.
 //
-import { getApiBaseUrl } from "./api.js";
+import { getApiBaseUrl, testBackendConnection } from "./api.js";
 
 const TOKEN_KEY = "auth_token";
 const USER_KEY = "auth_user";
 
 // PUBLIC_INTERFACE
 export function getToken() {
-  /** Returns the stored JWT token string or null if not present. */
   try {
     return globalThis?.localStorage?.getItem(TOKEN_KEY) || null;
   } catch {
+    // storage not available or access denied
     return null;
   }
 }
 
 // PUBLIC_INTERFACE
 export function setToken(token) {
-  /** Persists the JWT token to localStorage. */
   try {
     if (token) {
       globalThis.localStorage.setItem(TOKEN_KEY, token);
@@ -33,7 +32,6 @@ export function setToken(token) {
 
 // PUBLIC_INTERFACE
 export function clearAuth() {
-  /** Clears token and user from storage. */
   try {
     globalThis.localStorage.removeItem(TOKEN_KEY);
     globalThis.localStorage.removeItem(USER_KEY);
@@ -44,7 +42,6 @@ export function clearAuth() {
 
 // PUBLIC_INTERFACE
 export function getStoredUser() {
-  /** Returns cached user object from localStorage if present. */
   try {
     const raw = globalThis.localStorage.getItem(USER_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -55,7 +52,6 @@ export function getStoredUser() {
 
 // PUBLIC_INTERFACE
 export function setStoredUser(user) {
-  /** Persists user object to localStorage. */
   try {
     if (user) {
       globalThis.localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -69,102 +65,198 @@ export function setStoredUser(user) {
 
 // PUBLIC_INTERFACE
 export async function authFetch(path, options = {}) {
-  /**
-   * Wrapper around fetch that attaches Authorization: Bearer <token> when available.
-   * Uses same-origin or VITE_API_BASE_URL.
-   */
   const base = getApiBaseUrl();
   const url = path.startsWith("http") ? path : `${base}${path}`;
   const token = getToken();
 
+  try {
+    globalThis?.console?.log?.('🔧 authFetch called:', {
+      baseUrl: base,
+      fullUrl: url,
+      method: options.method || 'GET',
+      hasToken: !!token
+    });
+  } catch {
+    // ignore logging issues
+  }
+
   const headers = {
-    ...(options.headers || {}),
     "Content-Type": "application/json",
+    ...(options.headers || {}),
   };
+  
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const f = typeof globalThis !== "undefined" && globalThis.fetch ? globalThis.fetch : null;
-  if (!f) throw new Error("fetch is not available in this environment");
+  try {
+    const f = typeof globalThis !== 'undefined' && globalThis.fetch ? globalThis.fetch : null;
+    if (!f) throw new Error('fetch is not available in this environment');
 
-  const res = await f(url, {
-    credentials: "include",
-    ...options,
-    headers,
-  });
-  return res;
+    const response = await f(url, {
+      credentials: "include", // Critical for CORS
+      ...options,
+      headers,
+    });
+
+    try {
+      globalThis?.console?.log?.('🔧 authFetch response:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: response.url,
+        ok: response.ok
+      });
+    } catch {
+      // ignore logging issues
+    }
+
+    return response;
+  } catch (error) {
+    try {
+      globalThis?.console?.error?.('🔧 authFetch error:', error);
+    } catch {
+      // ignore logging issues
+    }
+    throw new Error(`Network error: ${error.message}`);
+  }
 }
 
 // PUBLIC_INTERFACE
 export async function signup({ username, email, password }) {
-  /**
-   * Calls POST /api/auth/signup to create a user. On success stores token and user.
-   * Returns { user, token }.
-   */
+  try {
+    globalThis?.console?.log?.('🔧 Signup attempt for:', email);
+  } catch {
+    // ignore logging issues
+  }
+  
   const res = await authFetch("/api/auth/signup", {
     method: "POST",
     body: JSON.stringify({ username, email, password }),
   });
+
   if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(errText || `Signup failed: ${res.status}`);
+    let errorMessage = `Signup failed: ${res.status}`;
+    try {
+      const errorData = await res.json();
+      errorMessage = errorData.message || errorData.error || errorMessage;
+    } catch {
+      const errorText = await res.text().catch(() => "");
+      if (errorText) errorMessage = errorText;
+    }
+    throw new Error(errorMessage);
   }
+
   const data = await res.json();
   const { token, user } = data || {};
-  setToken(token);
-  setStoredUser(user);
+  
+  if (token) setToken(token);
+  if (user) setStoredUser(user);
+  
   return data;
 }
 
 // PUBLIC_INTERFACE
 export async function login({ email, password }) {
-  /**
-   * Calls POST /api/auth/login. On success stores token and user if returned.
-   * Returns { user, token }.
-   */
+  try {
+    globalThis?.console?.log?.('🔧 Login attempt for:', email);
+  } catch {
+    // ignore logging issues
+  }
+  
+  // Test backend connection first
+  const connectionTest = await testBackendConnection();
+  if (!connectionTest.ok) {
+    throw new Error(`Cannot connect to backend: ${connectionTest.error || 'Connection failed'}`);
+  }
+
   const res = await authFetch("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
+
   if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(errText || `Login failed: ${res.status}`);
+    let errorMessage = `Login failed: ${res.status}`;
+    
+    try {
+      const errorData = await res.json();
+      errorMessage = errorData.message || errorData.error || errorMessage;
+    } catch {
+      try {
+        const errorText = await res.text();
+        if (errorText) errorMessage = errorText;
+      } catch {
+        // Use default error message
+      }
+    }
+    
+    try {
+      globalThis?.console?.error?.('🔧 Login error:', errorMessage);
+    } catch {
+      // ignore logging issues
+    }
+    throw new Error(errorMessage);
   }
+
   const data = await res.json();
+  try {
+    globalThis?.console?.log?.('🔧 Login success:', data);
+  } catch {
+    // ignore logging issues
+  }
+  
   const { token, user } = data || {};
-  setToken(token);
-  // Some backends may not return user here, so fetch /me if missing
+  
+  if (token) {
+    setToken(token);
+  }
+  
   if (user) {
     setStoredUser(user);
   } else {
+    // Try to fetch user profile if not returned
     try {
       const me = await getCurrentUser();
       setStoredUser(me);
-    } catch {
-      // ignore
+    } catch (error) {
+      try {
+        globalThis?.console?.warn?.('🔧 Failed to fetch user profile:', error);
+      } catch {
+        // ignore logging issues
+      }
     }
   }
+  
   return data;
 }
 
 // PUBLIC_INTERFACE
 export async function getCurrentUser() {
-  /** Calls GET /api/auth/me to retrieve the current user profile. */
-  const res = await authFetch("/api/auth/me", { method: "GET" });
+  const res = await authFetch("/api/auth/me");
+  
   if (!res.ok) {
-    throw new Error(`Unauthorized: ${res.status}`);
+    throw new Error(`Failed to get user: ${res.status}`);
   }
+  
   const data = await res.json();
   return data?.user ?? data;
 }
 
-/**
- * PUBLIC_INTERFACE
- * logout
- * Clears token and user client-side and returns true.
- */
+// PUBLIC_INTERFACE
 export async function logout() {
-  clearAuth();
+  try {
+    // Call backend logout if needed
+    await authFetch("/api/auth/logout", { method: "POST" });
+  } catch (error) {
+    try {
+      globalThis?.console?.warn?.('🔧 Logout API call failed:', error);
+    } catch {
+      // ignore logging issues
+    }
+  } finally {
+    clearAuth();
+  }
   return true;
 }
+
+// Export selected helpers
+export { testBackendConnection };
