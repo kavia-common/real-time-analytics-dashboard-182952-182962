@@ -965,6 +965,60 @@ body {
   position: relative;
   overflow: hidden;
 }
+
+/* Glassmorphism utilities and larger card variant for auth */
+.auth-card--large {
+  max-width: 560px; /* increase width */
+  padding: 32px;
+}
+
+.glass-card,
+.auth-card.glass-card {
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(255,255,255,0.35);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.12);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+/* Theme-specific soft glow around glass card */
+.theme-user .glass-card {
+  box-shadow:
+    0 10px 30px rgba(37,99,235,0.28),
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 0 0 1px rgba(37,99,235,0.12);
+}
+.theme-admin .glass-card {
+  box-shadow:
+    0 10px 30px rgba(124,58,237,0.28),
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 0 0 1px rgba(124,58,237,0.12);
+}
+
+/* Smooth entrance animation */
+@keyframes floatInUp {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); filter: blur(2px); }
+  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.animate-auth-enter,
+.card-appear { /* card-appear already used in views – keep as alias */
+  animation: floatInUp 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .animate-auth-enter,
+  .card-appear {
+    animation: none;
+  }
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+  .auth-card--large {
+    padding: 22px;
+  }
+}
 .auth-blob {
   position: absolute;
   border-radius: 999px;
