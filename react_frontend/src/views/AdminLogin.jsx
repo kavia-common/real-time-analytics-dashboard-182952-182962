@@ -45,19 +45,21 @@ export default function AdminLogin() {
       <div className="auth-blob two" aria-hidden="true" />
 
       <div className="auth-card auth-card--large auth-card--taller glass-card card-appear" role="region" aria-label="Admin sign in form">
-        <div className="auth-header">
-          <div className="auth-icon" aria-hidden="true">🛡️</div>
-          <div>
-            <h2 className="auth-title">Admin Sign In</h2>
-            <p className="auth-subtitle">Access administrative tools</p>
+        <div className="auth-stack">
+          <div className="auth-headblock">
+            <div className="auth-icon" aria-hidden="true">🛡️</div>
+            <div className="auth-headtext">
+              <h2 className="auth-title">Admin sign in</h2>
+              <p className="auth-subtitle">Access administrative tools</p>
+              <p className="auth-tagline">Welcome back, admin</p>
+            </div>
           </div>
-        </div>
 
         {error ? <div className="auth-error" role="alert">{String(error)}</div> : null}
 
         <form onSubmit={onSubmit} className="auth-form">
-          <label className="auth-label" htmlFor="admin-email">
-            Email
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="admin-email">Email</label>
             <div className="input-wrap">
               <span className="input-icon" aria-hidden="true">📧</span>
               <input
@@ -73,10 +75,10 @@ export default function AdminLogin() {
                 aria-invalid={error ? "true" : "false"}
               />
             </div>
-          </label>
+          </div>
 
-          <label className="auth-label" htmlFor="admin-password">
-            Password
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="admin-password">Password</label>
             <div className="input-wrap">
               <span className="input-icon" aria-hidden="true">🔑</span>
               <input
@@ -90,7 +92,7 @@ export default function AdminLogin() {
                 aria-required="true"
               />
             </div>
-          </label>
+          </div>
 
           <button
             className={`btn-primary auth-submit ${submitting ? "is-loading" : ""}`}
@@ -104,6 +106,7 @@ export default function AdminLogin() {
 
         <div className="auth-alt">
           Need an admin account? <a href="/admin/signup" className="btn-link">Admin signup</a>
+        </div>
         </div>
       </div>
     </div>

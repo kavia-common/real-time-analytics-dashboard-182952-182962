@@ -111,13 +111,15 @@ export default function Login() {
       <div className="auth-blob two" aria-hidden="true" />
 
       <div className="auth-card auth-card--large auth-card--taller glass-card card-appear" role="main" aria-label="User sign in">
-        <div className="auth-header">
-          <div className="auth-icon" aria-hidden="true">🔐</div>
-          <div>
-            <h1 className="auth-title">Welcome back</h1>
-            <p className="auth-subtitle">Sign in to continue to your dashboard</p>
+        <div className="auth-stack">
+          <div className="auth-headblock">
+            <div className="auth-icon" aria-hidden="true">🔐</div>
+            <div className="auth-headtext">
+              <h1 className="auth-title">Sign in</h1>
+              <p className="auth-subtitle">Access your dashboard</p>
+              <p className="auth-tagline">Welcome back</p>
+            </div>
           </div>
-        </div>
 
         {error && (
           <div className="auth-error" role="alert" aria-live="polite">
@@ -226,6 +228,7 @@ export default function Login() {
           >
             Forgot your password?
           </a>
+        </div>
         </div>
       </div>
     </div>

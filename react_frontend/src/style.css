@@ -1086,6 +1086,102 @@ body {
   align-items: center;
   gap: 12px;
 }
+
+/* New: Consistent vertical stack and alignment utilities for auth cards */
+.auth-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.auth-headblock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auth-headtext {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.auth-title {
+  margin: 0;
+  color: var(--theme-accent);
+  font-size: 1.5rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.auth-subtitle {
+  margin: 0;
+  color: #374151;
+  font-size: var(--font-md);
+}
+
+.auth-tagline {
+  margin: 2px 0 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* Keep labels and input-with-icon vertically aligned and consistent */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.auth-label {
+  font-size: 13px;
+  color: #374151;
+}
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input-icon {
+  position: absolute;
+  left: 12px;
+  color: #6b7280;
+  font-size: 16px;
+}
+.auth-input {
+  width: 100%;
+  padding: 12px 14px 12px 40px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  outline: none;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition), transform var(--transition);
+  background: #fff;
+}
+
+/* Center content within the glass card and keep neat spacing on all screens */
+.auth-card.glass-card,
+.auth-card--large.glass-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.auth-card.glass-card > *,
+.auth-card--large.glass-card > * {
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  max-width: 520px;
+}
+@media (max-width: 480px) {
+  .auth-stack { gap: 14px; }
+  .auth-title { font-size: 1.35rem; }
+  .auth-card.glass-card > *, .auth-card--large.glass-card > * { max-width: 100%; }
+}
 .auth-icon {
   width: 40px;
   height: 40px;
