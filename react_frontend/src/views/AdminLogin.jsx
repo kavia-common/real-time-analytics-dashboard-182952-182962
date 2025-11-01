@@ -5,13 +5,13 @@ import { useLocation } from "react-router-dom";
 /**
  * PUBLIC_INTERFACE
  * AdminLogin
- * Login page for admins. On success, redirects to /admin.
+ * Login page for admins in a modern purple-themed card. On success, redirects to /admin.
  */
 export default function AdminLogin() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail]         = useState("");
+  const [password, setPassword]   = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError]         = useState("");
   const location = useLocation();
 
   useEffect(() => {
@@ -43,7 +43,8 @@ export default function AdminLogin() {
     <div className="auth-container theme-admin">
       <div className="auth-blob one" aria-hidden="true" />
       <div className="auth-blob two" aria-hidden="true" />
-      <div className="auth-card" role="region" aria-label="Admin sign in form">
+
+      <div className="auth-card card-appear" role="region" aria-label="Admin sign in form">
         <div className="auth-header">
           <div className="auth-icon" aria-hidden="true">🛡️</div>
           <div>
@@ -51,7 +52,9 @@ export default function AdminLogin() {
             <p className="auth-subtitle">Access administrative tools</p>
           </div>
         </div>
+
         {error ? <div className="auth-error" role="alert">{String(error)}</div> : null}
+
         <form onSubmit={onSubmit} className="auth-form">
           <label className="auth-label" htmlFor="admin-email">
             Email
@@ -71,6 +74,7 @@ export default function AdminLogin() {
               />
             </div>
           </label>
+
           <label className="auth-label" htmlFor="admin-password">
             Password
             <div className="input-wrap">
@@ -87,6 +91,7 @@ export default function AdminLogin() {
               />
             </div>
           </label>
+
           <button
             className={`btn-primary auth-submit ${submitting ? "is-loading" : ""}`}
             type="submit"
@@ -96,6 +101,7 @@ export default function AdminLogin() {
             {submitting ? "Signing in…" : "Sign In"}
           </button>
         </form>
+
         <div className="auth-alt">
           Need an admin account? <a href="/admin/signup" className="btn-link">Admin signup</a>
         </div>

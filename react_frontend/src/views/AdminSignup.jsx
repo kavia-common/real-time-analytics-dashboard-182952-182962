@@ -4,14 +4,14 @@ import { adminSignup } from "../adminAuth.js";
 /**
  * PUBLIC_INTERFACE
  * AdminSignup
- * Admin signup page. On success, redirects to /admin.
+ * Admin signup page with modern purple-themed card and transitions. On success, redirects to /admin.
  */
 export default function AdminSignup() {
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername]   = useState("");
+  const [email, setEmail]         = useState("");
+  const [password, setPassword]   = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError]         = useState("");
 
   const strength = useMemo(() => {
     const pwd = String(password || "");
@@ -22,8 +22,10 @@ export default function AdminSignup() {
     return Math.min(3, score);
   }, [password]);
 
-  const strengthClass = strength === 1 ? "pw-weak" : strength === 2 ? "pw-medium" : strength === 3 ? "pw-strong" : "";
-  const strengthText = strength === 0 ? "Enter a password (min 8 chars)" : strength === 1 ? "Weak" : strength === 2 ? "Medium" : "Strong";
+  const strengthClass =
+    strength === 1 ? "pw-weak" : strength === 2 ? "pw-medium" : strength === 3 ? "pw-strong" : "";
+  const strengthText =
+    strength === 0 ? "Enter a password (min 8 chars)" : strength === 1 ? "Weak" : strength === 2 ? "Medium" : "Strong";
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -45,15 +47,18 @@ export default function AdminSignup() {
     <div className="auth-container theme-admin">
       <div className="auth-blob one" aria-hidden="true" />
       <div className="auth-blob two" aria-hidden="true" />
-      <div className="auth-card" role="region" aria-label="Admin signup form">
+
+      <div className="auth-card card-appear" role="region" aria-label="Admin signup form">
         <div className="auth-header">
-          <div className="auth-icon" aria-hidden="true">🧰</div>
+          <div className="auth-icon" aria-hidden="true">💼</div>
           <div>
             <h2 className="auth-title">Create admin account</h2>
             <p className="auth-subtitle">Provision administrative access</p>
           </div>
         </div>
+
         {error ? <div className="auth-error" role="alert">{String(error)}</div> : null}
+
         <form onSubmit={onSubmit} className="auth-form">
           <label className="auth-label" htmlFor="admin-username">
             Username
@@ -72,6 +77,7 @@ export default function AdminSignup() {
               />
             </div>
           </label>
+
           <label className="auth-label" htmlFor="admin-email">
             Email
             <div className="input-wrap">
@@ -88,6 +94,7 @@ export default function AdminSignup() {
               />
             </div>
           </label>
+
           <label className="auth-label" htmlFor="admin-password">
             Password
             <div className="input-wrap">
@@ -104,6 +111,7 @@ export default function AdminSignup() {
                 aria-describedby="admin-pw-hint"
               />
             </div>
+
             <div className={`pw-meter ${strengthClass}`} aria-hidden="true">
               <div className="pw-bar" />
               <div className="pw-bar" />
@@ -111,6 +119,7 @@ export default function AdminSignup() {
             </div>
             <div id="admin-pw-hint" className="pw-hint" role="note">Strength: {strengthText}</div>
           </label>
+
           <button
             className={`btn-primary auth-submit ${submitting ? "is-loading" : ""}`}
             type="submit"
@@ -120,6 +129,7 @@ export default function AdminSignup() {
             {submitting ? "Creating…" : "Create Admin"}
           </button>
         </form>
+
         <div className="auth-alt">
           Already an admin? <a href="/admin/login" className="btn-link">Sign in</a>
         </div>

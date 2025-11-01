@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from "react-router-dom";
  * PUBLIC_INTERFACE
  * Login
  * Login page for existing users. On success, redirects to dashboard or intended destination.
+ * Uses large centered card with modern blue theme and smooth transitions.
  */
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -18,10 +19,10 @@ export default function Login() {
     email: false,
     password: false
   });
-  
+
   const location = useLocation();
   const navigate = useNavigate();
-  const from = location.state?.from?.pathname || "/";
+  const from = location.state?.from?.pathname || "/dashboard";
 
   // Clear location state error on component mount
   useEffect(() => {
@@ -29,51 +30,51 @@ export default function Login() {
     if (locationError) {
       setError(locationError);
       // Clean up the location state to prevent showing error on revisit
-      window.history.replaceState({}, document.title);
+      if (typeof window !== "undefined") {
+        window.history.replaceState({}, document.title);
+      }
     }
   }, [location?.state?.error]);
 
-  const handleInputChange = useCallback((field) => (e) => {
-    const value = e.target.value;
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (error) {
-      setError("");
-    }
-  }, [error]);
+  const handleInputChange = useCallback(
+    (field) => (e) => {
+      const value = e.target.value;
+      setFormData((prev) => ({ ...prev, [field]: value }));
+      if (error) setError("");
+    },
+    [error]
+  );
 
-  const handleBlur = useCallback((field) => () => {
-    setTouched(prev => ({ ...prev, [field]: true }));
-  }, []);
+  const handleBlur = useCallback(
+    (field) => () => {
+      setTouched((prev) => ({ ...prev, [field]: true }));
+    },
+    []
+  );
 
-  const getFieldError = useCallback((field) => {
-    if (!touched[field]) return "";
-    
-    if (field === "email" && formData.email && !isValidEmail(formData.email)) {
-      return "Please enter a valid email address";
-    }
-    
-    if (field === "password" && !formData.password) {
-      return "Password is required";
-    }
-    
-    return "";
-  }, [formData, touched]);
+  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const isValidEmail = (email) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
+  const getFieldError = useCallback(
+    (field) => {
+      if (!touched[field]) return "";
+      if (field === "email" && formData.email && !isValidEmail(formData.email)) {
+        return "Please enter a valid email address";
+      }
+      if (field === "password" && !formData.password) {
+        return "Password is required";
+      }
+      return "";
+    },
+    [formData, touched]
+  );
 
-  const isFormValid = formData.email && 
-                     isValidEmail(formData.email) && 
-                     formData.password;
+  const isFormValid =
+    formData.email && isValidEmail(formData.email) && formData.password;
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    
-    // Mark all fields as touched to show validation errors
     setTouched({ email: true, password: true });
-    
+
     if (!isFormValid) {
       setError("Please fix the validation errors above");
       return;
@@ -84,18 +85,16 @@ export default function Login() {
 
     try {
       await login({ email: formData.email, password: formData.password });
-      // Use navigate for SPA navigation instead of full page reload
       navigate(from, { replace: true });
     } catch (err) {
-      const errorMessage = err?.message || "Login failed. Please check your credentials.";
+      const errorMessage =
+        err?.message || "Login failed. Please check your credentials.";
       setError(errorMessage);
-      
+
       // Focus on email field for accessibility after error
       setTimeout(() => {
         const emailInput = document.getElementById("email");
-        if (emailInput) {
-          emailInput.focus();
-        }
+        if (emailInput) emailInput.focus();
       }, 100);
     } finally {
       setSubmitting(false);
@@ -110,8 +109,8 @@ export default function Login() {
     <div className="auth-container theme-user">
       <div className="auth-blob one" aria-hidden="true" />
       <div className="auth-blob two" aria-hidden="true" />
-      
-      <div className="auth-card" role="main" aria-label="User sign in">
+
+      <div className="auth-card card-appear" role="main" aria-label="User sign in">
         <div className="auth-header">
           <div className="auth-icon" aria-hidden="true">🔐</div>
           <div>
@@ -120,22 +119,16 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Error Display */}
         {error && (
-          <div 
-            className="auth-error" 
-            role="alert" 
-            aria-live="polite"
-          >
+          <div className="auth-error" role="alert" aria-live="polite">
             {error}
           </div>
         )}
 
-        {/* Validation Errors Summary */}
         {showFormErrors && !error && (
-          <div 
-            className="auth-error auth-error--validation" 
-            role="alert" 
+          <div
+            className="auth-error auth-error--validation"
+            role="alert"
             aria-live="polite"
           >
             <strong>Please fix the following issues:</strong>
@@ -147,7 +140,6 @@ export default function Login() {
         )}
 
         <form onSubmit={onSubmit} className="auth-form" noValidate>
-          {/* Email Field */}
           <div className="auth-field">
             <label className="auth-label" htmlFor="email">
               Email address
@@ -179,7 +171,6 @@ export default function Login() {
             )}
           </div>
 
-          {/* Password Field */}
           <div className="auth-field">
             <label className="auth-label" htmlFor="password">
               Password
@@ -216,32 +207,20 @@ export default function Login() {
             disabled={submitting || (!isFormValid && touched.email && touched.password)}
             aria-busy={submitting}
           >
-            {submitting ? (
-              <>
-                <span className="spinner" aria-hidden="true"></span>
-                Signing in...
-              </>
-            ) : (
-              "Sign In"
-            )}
+            {submitting ? "Signing in..." : "Sign In"}
           </button>
         </form>
 
         <div className="auth-alt">
           New here?{" "}
-          <a 
-            href="/signup" 
-            className="btn-link"
-            aria-disabled={submitting}
-          >
+          <a href="/signup" className="btn-link" aria-disabled={submitting}>
             Create an account
           </a>
         </div>
 
-        {/* Forgot Password Link */}
         <div className="auth-alt auth-alt--secondary">
-          <a 
-            href="/forgot-password" 
+          <a
+            href="/forgot-password"
             className="btn-link btn-link--secondary"
             aria-disabled={submitting}
           >
