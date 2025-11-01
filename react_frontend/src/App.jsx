@@ -48,7 +48,7 @@ export default function App() {
 
   // Setup Socket.io connection
   useEffect(() => {
-    const socketURL = getSocketUrl(); // In dev '', so io connects to same-origin via '/socket.io'; in prod uses env/origin
+    const socketURL = getSocketUrl(); // VITE_SOCKET_URL or same-origin
     try {
       const s = io(socketURL, {
         path: "/socket.io", // default Socket.io path; backend should use same

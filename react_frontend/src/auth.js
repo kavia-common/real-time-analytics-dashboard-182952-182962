@@ -73,7 +73,7 @@ export async function authFetch(path, options = {}) {
    * Wrapper around fetch that attaches Authorization: Bearer <token> when available.
    * Uses same-origin or VITE_API_BASE_URL.
    */
-  const base = getApiBaseUrl(); // In dev this is '', producing relative '/api/...'
+  const base = getApiBaseUrl();
   const url = path.startsWith("http") ? path : `${base}${path}`;
   const token = getToken();
 

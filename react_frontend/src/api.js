@@ -1,5 +1,6 @@
- // Guard window access for Node lint/build environments
-const defaultOrigin =
+const defaultBase = "";
+// Guard window access for Node lint/build environments
+const defaultSocket =
   typeof globalThis !== "undefined" && typeof globalThis.window !== "undefined"
     ? globalThis.window.location.origin
     : "";
@@ -7,73 +8,12 @@ const defaultOrigin =
 /**
  * PUBLIC_INTERFACE
  * getApiBaseUrl
- * Resolves the REST API base URL:
- * - Development (vite): always use relative '' so requests are like '/api/...'
- *   letting Vite devServer proxy forward to backend.
- * - Production: honor VITE_API_BASE_URL when provided; otherwise same-origin.
+ * Resolves the REST API base URL from env or falls back to same origin.
  */
 export function getApiBaseUrl() {
-  const env = import.meta?.env || {};
-  if (env.DEV) {
-    // Use relative path in dev so fetch('/api/...') hits Vite proxy.
-    return "";
-  }
-  // Production: use configured base if present, else same-origin.
-  const base = env.VITE_API_BASE_URL;
-  return (base && String(base).trim()) || defaultOrigin || "";
-}
-
-/**
- * PUBLIC_INTERFACE
- * testBackendConnection
- * Performs a lightweight GET /health (or /) to verify backend reachability.
- * Returns { ok: boolean, status?: number, error?: string }.
- */
-export async function testBackendConnection() {
-  try {
-    const base = getApiBaseUrl();
-    const healthUrls = [`${base}/health`, `${base}/`];
-    const f = typeof globalThis !== "undefined" && globalThis.fetch ? globalThis.fetch : null;
-    if (!f) return { ok: false, error: "fetch not available" };
-    for (const u of healthUrls) {
-      try {
-        const res = await f(u, { method: "GET", credentials: "include" });
-        if (res.ok || res.status === 200) {
-          return { ok: true, status: res.status };
-        }
-      } catch {
-        // try next
-      }
-    }
-    return { ok: false, error: "All health checks failed" };
-  } catch (e) {
-    return { ok: false, error: e?.message || String(e) };
-  }
-}
-
-/**
- * PUBLIC_INTERFACE
- * debugEnvironment
- * Logs a small diagnostics bundle in dev to help understand API base resolution.
- */
-export function debugEnvironment() {
-  try {
-    if (import.meta?.env?.MODE !== "production") {
-      const env = import.meta?.env || {};
-      const diag = {
-        VITE_API_BASE_URL: env.VITE_API_BASE_URL,
-        VITE_SOCKET_URL: env.VITE_SOCKET_URL,
-        MODE: env.MODE,
-        DEV: env.DEV,
-        PROD: env.PROD,
-        baseResolved: getApiBaseUrl(),
-        socketResolved: getSocketUrl(),
-      };
-      globalThis?.console?.log?.("[API Debug] env diagnostics:", diag);
-    }
-  } catch {
-    // ignore
-  }
+  const env = import.meta?.env;
+  const base = env?.VITE_API_BASE_URL ?? defaultBase;
+  return base || defaultBase;
 }
 
 /**
@@ -106,19 +46,12 @@ export async function getEventHeatmap(range = "7d") {
 /**
  * PUBLIC_INTERFACE
  * getSocketUrl
- * Resolves the Socket.io connection URL:
- * - Development: return '' so client connects to same origin with relative path
- *   and Vite proxy handles '/socket.io'.
- * - Production: use VITE_SOCKET_URL when set; otherwise same-origin.
+ * Resolves the Socket.io server URL from env or falls back to same origin.
  */
 export function getSocketUrl() {
-  const env = import.meta?.env || {};
-  if (env.DEV) {
-    // Relative URL in dev so io('', { path:'/socket.io' }) -> same host:port as Vite.
-    return "";
-  }
-  const configured = env.VITE_SOCKET_URL;
-  return (configured && String(configured).trim()) || defaultOrigin || "";
+  const env = import.meta?.env;
+  const base = env?.VITE_SOCKET_URL ?? defaultSocket;
+  return base || defaultSocket;
 }
 
 /**

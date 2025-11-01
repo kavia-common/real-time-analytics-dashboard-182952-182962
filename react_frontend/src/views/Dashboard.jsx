@@ -169,7 +169,7 @@ export default function Dashboard() {
 
   // Socket for live refresh on metrics updates
   useEffect(() => {
-    const socketURL = getSocketUrl(); // In dev '', so io uses same-origin '/socket.io'; in prod env/origin
+    const socketURL = getSocketUrl();
     try {
       const s = io(socketURL, {
         path: "/socket.io",
