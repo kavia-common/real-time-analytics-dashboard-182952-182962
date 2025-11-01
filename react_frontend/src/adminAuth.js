@@ -71,7 +71,7 @@ export function setStoredAdminUser(user) {
 export async function adminAuthFetch(path, options = {}) {
   /**
    * Wrapper around fetch that attaches Authorization: Bearer <adminToken> when available.
-   * Uses same-origin or VITE_BACKEND_URL, with backward-compatible fallback to VITE_API_BASE_URL.
+   * Uses same-origin or VITE_API_BASE_URL.
    */
   const base = getApiBaseUrl();
   const url = path.startsWith("http") ? path : `${base}${path}`;
@@ -91,8 +91,8 @@ export async function adminAuthFetch(path, options = {}) {
       : null;
   if (!f) throw new Error("fetch is not available in this environment");
 
-  // Do NOT include credentials (cookies); admin APIs are Bearer-only.
   const res = await f(url, {
+    credentials: "include",
     ...options,
     headers,
   });

@@ -1,96 +1,101 @@
 //
-// Utility formatting helpers used across dashboard components.
-
 // PUBLIC_INTERFACE
+// numberFmt
+// Formats a number with locale thousand separators.
+//
 export function numberFmt(n, opts = {}) {
-  /** Format a number with the current locale. */
   const v = Number(n || 0);
   return v.toLocaleString(undefined, opts);
 }
 
 // PUBLIC_INTERFACE
-export function dateFmtYMD(d) {
-  /** Format a date string YYYY-MM-DD from ISO or YMD input. */
+// dateFmtYMD
+// Formats a YYYY-MM-DD string into a localized short date label.
+//
+export function dateFmtYMD(ymd) {
   try {
-    const dt = new Date(d);
-    if (!isNaN(dt.valueOf())) {
-      const y = dt.getFullYear();
-      const m = String(dt.getMonth() + 1).padStart(2, '0');
-      const day = String(dt.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    }
-    // fall back
-    const s = String(d || '');
-    return s.slice(0, 10);
+    if (!ymd) return "-";
+    const [y, m, d] = String(ymd).split("-").map((x) => Number(x));
+    const dt = new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+    if (Number.isNaN(dt.getTime())) return String(ymd);
+    return dt.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   } catch {
-    return String(d || '');
+    return String(ymd);
   }
 }
 
 // PUBLIC_INTERFACE
-export function dateFmtFull(d) {
-  /** Full date-time string with locale. */
+// dateFmtFull
+// Formats a YYYY-MM-DD (or ISO) into a full localized date.
+//
+export function dateFmtFull(isoOrYmd) {
   try {
-    const dt = new Date(d);
-    if (!isNaN(dt.valueOf())) {
-      return dt.toLocaleString(undefined, { hour12: false });
+    if (!isoOrYmd) return "-";
+    let d;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(isoOrYmd)) {
+      const [y, m, dd] = String(isoOrYmd).split("-").map((x) => Number(x));
+      d = new Date(Date.UTC(y, (m || 1) - 1, dd || 1));
+    } else {
+      d = new Date(isoOrYmd);
     }
-    return String(d || '');
+    if (Number.isNaN(d.getTime())) return String(isoOrYmd);
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   } catch {
-    return String(d || '');
+    return String(isoOrYmd);
   }
 }
 
 // PUBLIC_INTERFACE
-export function computeMovingAverage(arr, getValue = (x) => x, windowSize = 7) {
-  /** Compute simple moving average over an array of data points. */
+// computeMovingAverage
+// Computes a simple moving average for an array of items using a numeric accessor.
+// Returns an array aligned to input with nulls for the first (window-1) positions.
+//
+export function computeMovingAverage(arr, accessor, window = 7) {
   const out = new Array(arr.length).fill(null);
-  const w = Math.max(1, Number(windowSize));
+  if (!Array.isArray(arr) || arr.length === 0 || window <= 1) {
+    return arr.map((v) => accessor(v));
+  }
   let sum = 0;
   for (let i = 0; i < arr.length; i++) {
-    sum += Number(getValue(arr[i]) || 0);
-    if (i >= w) {
-      sum -= Number(getValue(arr[i - w]) || 0);
+    const val = Number(accessor(arr[i]) || 0);
+    sum += val;
+    if (i >= window) {
+      sum -= Number(accessor(arr[i - window]) || 0);
     }
-    if (i >= w - 1) {
-      out[i] = sum / w;
+    if (i >= window - 1) {
+      out[i] = sum / window;
     }
   }
   return out;
 }
 
 // PUBLIC_INTERFACE
-export function getMinAvgMax(arr, getValue = (x) => x) {
-  /** Return { min, avg, max } over numeric sequence. */
-  if (!Array.isArray(arr) || arr.length === 0) return { min: 0, avg: 0, max: 0 };
-  let min = Infinity;
-  let max = -Infinity;
+// getMinAvgMax
+// Returns { min, avg, max } for numeric series via accessor.
+//
+export function getMinAvgMax(arr, accessor) {
+  const vals = (arr || []).map((v) => Number(accessor(v) || 0));
+  if (vals.length === 0) return { min: 0, avg: 0, max: 0 };
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
   let sum = 0;
-  let count = 0;
-  for (const item of arr) {
-    const v = Number(getValue(item) || 0);
-    if (isNaN(v)) continue;
-    min = Math.min(min, v);
-    max = Math.max(max, v);
+  for (const v of vals) {
+    if (v < min) min = v;
+    if (v > max) max = v;
     sum += v;
-    count++;
   }
-  const avg = count > 0 ? sum / count : 0;
-  if (!isFinite(min)) min = 0;
-  if (!isFinite(max)) max = 0;
-  return { min, avg, max };
+  return { min, avg: sum / vals.length, max };
 }
 
 // PUBLIC_INTERFACE
+// deltaArrow
+// Returns { delta, arrow, colorClass } where arrow is "▲"|"▼"|"–" and color classes for Ocean theme.
+//
 export function deltaArrow(current, previous) {
-  /** Return arrow and styling info for deltas. */
   const c = Number(current || 0);
   const p = Number(previous || 0);
-  const diff = c - p;
-  if (diff > 0) {
-    return { delta: diff, arrow: '▲', colorClass: 'delta-up' };
-    } else if (diff < 0) {
-    return { delta: diff, arrow: '▼', colorClass: 'delta-down' };
-  }
-  return { delta: 0, arrow: '–', colorClass: 'delta-flat' };
+  const delta = c - p;
+  if (delta > 0) return { delta, arrow: "▲", colorClass: "delta-up" };
+  if (delta < 0) return { delta, arrow: "▼", colorClass: "delta-down" };
+  return { delta: 0, arrow: "–", colorClass: "delta-flat" };
 }

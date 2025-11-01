@@ -71,7 +71,7 @@ export function setStoredUser(user) {
 export async function authFetch(path, options = {}) {
   /**
    * Wrapper around fetch that attaches Authorization: Bearer <token> when available.
-   * Uses same-origin or VITE_BACKEND_URL, with backward-compatible fallback to VITE_API_BASE_URL.
+   * Uses same-origin or VITE_API_BASE_URL.
    */
   const base = getApiBaseUrl();
   const url = path.startsWith("http") ? path : `${base}${path}`;
@@ -88,8 +88,8 @@ export async function authFetch(path, options = {}) {
   const f = typeof globalThis !== "undefined" && globalThis.fetch ? globalThis.fetch : null;
   if (!f) throw new Error("fetch is not available in this environment");
 
-  // Do NOT include credentials (cookies); use Bearer token only to simplify CORS.
   const res = await f(url, {
+    credentials: "include",
     ...options,
     headers,
   });

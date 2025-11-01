@@ -1,13 +1,5 @@
-//
-// API utilities for REST and Socket configuration
-//
-
-
-
-// Same-origin sentinel for building URLs when no env is provided
-const SAME_ORIGIN = "";
-
-// Resolve same-origin for sockets when window is available
+const defaultBase = "";
+// Guard window access for Node lint/build environments
 const defaultSocket =
   typeof globalThis !== "undefined" && typeof globalThis.window !== "undefined"
     ? globalThis.window.location.origin
@@ -17,27 +9,11 @@ const defaultSocket =
  * PUBLIC_INTERFACE
  * getApiBaseUrl
  * Resolves the REST API base URL from env or falls back to same origin.
- * Primary variable: VITE_BACKEND_URL
- * Backward compatibility fallback: VITE_API_BASE_URL
- * If neither is set, returns empty string which means "same-origin".
  */
 export function getApiBaseUrl() {
   const env = import.meta?.env;
-  const base = env?.VITE_BACKEND_URL ?? env?.VITE_API_BASE_URL ?? SAME_ORIGIN;
-
-  // Build-time/runtime guard: warn in production if BACKEND_URL missing.
-  try {
-    const isProd = env?.PROD === true || env?.MODE === "production";
-    if (isProd && !env?.VITE_BACKEND_URL && typeof globalThis !== "undefined" && globalThis.console) {
-      globalThis.console.warn(
-        "[config] VITE_BACKEND_URL is not set in production; frontend will use same-origin for REST calls. Set VITE_BACKEND_URL to your backend URL."
-      );
-    }
-  } catch {
-    // ignore any env access errors
-  }
-
-  return base || SAME_ORIGIN;
+  const base = env?.VITE_API_BASE_URL ?? defaultBase;
+  return base || defaultBase;
 }
 
 /**
@@ -70,27 +46,18 @@ export async function getEventHeatmap(range = "7d") {
 /**
  * PUBLIC_INTERFACE
  * getSocketUrl
- * Resolves the Socket.io server URL with priority:
- * - VITE_SOCKET_URL
- * - VITE_BACKEND_URL
- * - same-origin (window.location.origin)
+ * Resolves the Socket.io server URL from env or falls back to same origin.
  */
 export function getSocketUrl() {
   const env = import.meta?.env;
-  const socket = env?.VITE_SOCKET_URL;
-  if (socket && String(socket).trim() !== "") return socket;
-
-  const backend = env?.VITE_BACKEND_URL ?? env?.VITE_API_BASE_URL ?? "";
-  if (backend && String(backend).trim() !== "") return backend;
-
-  return defaultSocket;
+  const base = env?.VITE_SOCKET_URL ?? defaultSocket;
+  return base || defaultSocket;
 }
 
 /**
  * PUBLIC_INTERFACE
  * authorizedFetch
  * A thin wrapper that attaches Authorization header if auth.js provides a token.
- * Note: Never sets credentials: 'include'.
  */
 export async function authorizedFetch(url, options = {}) {
   let headers = { ...(options.headers || {}), "Content-Type": "application/json" };
@@ -102,6 +69,7 @@ export async function authorizedFetch(url, options = {}) {
     if (typeof url === "string") {
       if (url.startsWith("http://") || url.startsWith("https://")) {
         // Absolute URL: find the first slash after protocol and hostname
+        // e.g., https://host:port/path?query -> extract /path...
         const idxProto = url.indexOf("://");
         if (idxProto !== -1) {
           const afterProto = url.slice(idxProto + 3);
@@ -135,11 +103,9 @@ export async function authorizedFetch(url, options = {}) {
     // ignore
   }
 
-  const f = typeof globalThis !== "undefined" && typeof globalThis.fetch === "function" ? globalThis.fetch : null;
+  const f = typeof globalThis !== "undefined" && globalThis.fetch ? globalThis.fetch : null;
   if (!f) throw new Error("fetch is not available in this environment");
-
-  // Do NOT send credentials (cookies). We rely solely on Bearer tokens for auth.
-  return f(url, { ...options, headers });
+  return f(url, { credentials: "include", ...options, headers });
 }
 
 /**
@@ -170,7 +136,6 @@ export async function createEvent(payload) {
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    if (typeof globalThis !== "undefined" && globalThis.console) globalThis.console.warn("createEvent failed status:", res.status);
     throw new Error(`createEvent failed: ${res.status}`);
   }
   return res.json();

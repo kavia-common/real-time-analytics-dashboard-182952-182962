@@ -53,6 +53,7 @@ export default function App() {
       const s = io(socketURL, {
         path: "/socket.io", // default Socket.io path; backend should use same
         transports: ["websocket", "polling"],
+        withCredentials: true,
       });
       socketRef.current = s;
 
