@@ -3,23 +3,33 @@
 // Ensures absolute URLs, environment-driven configuration, and safe defaults.
 //
 
-// PUBLIC_INTERFACE
+/* PUBLIC_INTERFACE */
 export function getBackendUrl() {
-  /** Returns the effective backend base URL for REST calls. */
-  const envUrl = import.meta.env.VITE_BACKEND_URL?.trim();
+  /** Returns the effective backend base URL for REST calls.
+   * Dev: '' to use relative '/api' with Vite proxy.
+   * Prod: VITE_BACKEND_URL when provided, else same-origin.
+   */
+  const env = import.meta.env || {};
+  if (env.DEV) return '';
+  const envUrl = env.VITE_BACKEND_URL && String(env.VITE_BACKEND_URL).trim();
   if (envUrl) return stripTrailingSlash(envUrl);
-  // Fallback to same-origin (useful in local dev when served via backend)
+  // same-origin fallback
   return (typeof globalThis !== 'undefined' && globalThis.window && globalThis.window.location && globalThis.window.location.origin)
     ? globalThis.window.location.origin
     : '';
 }
 
-// PUBLIC_INTERFACE
+/* PUBLIC_INTERFACE */
 export function getSocketUrl() {
-  /** Returns the effective socket.io base URL. Prefers VITE_SOCKET_URL, then VITE_BACKEND_URL, then same-origin. */
-  const socketEnv = import.meta.env.VITE_SOCKET_URL?.trim();
+  /** Effective socket.io base URL.
+   * Dev: '' to use relative '/socket.io' with Vite proxy.
+   * Prod: VITE_SOCKET_URL; else VITE_BACKEND_URL; else same-origin.
+   */
+  const env = import.meta.env || {};
+  if (env.DEV) return '';
+  const socketEnv = env.VITE_SOCKET_URL && String(env.VITE_SOCKET_URL).trim();
   if (socketEnv) return stripTrailingSlash(socketEnv);
-  const backend = import.meta.env.VITE_BACKEND_URL?.trim();
+  const backend = env.VITE_BACKEND_URL && String(env.VITE_BACKEND_URL).trim();
   if (backend) return stripTrailingSlash(backend);
   return (typeof globalThis !== 'undefined' && globalThis.window && globalThis.window.location && globalThis.window.location.origin)
     ? globalThis.window.location.origin

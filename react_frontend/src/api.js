@@ -1,6 +1,5 @@
-const defaultBase = "";
-// Guard window access for Node lint/build environments
-const defaultSocket =
+ // Guard window access for Node lint/build environments
+const defaultOrigin =
   typeof globalThis !== "undefined" && typeof globalThis.window !== "undefined"
     ? globalThis.window.location.origin
     : "";
@@ -8,12 +7,20 @@ const defaultSocket =
 /**
  * PUBLIC_INTERFACE
  * getApiBaseUrl
- * Resolves the REST API base URL from env or falls back to same origin.
+ * Resolves the REST API base URL:
+ * - Development (vite): always use relative '' so requests are like '/api/...'
+ *   letting Vite devServer proxy forward to backend.
+ * - Production: honor VITE_API_BASE_URL when provided; otherwise same-origin.
  */
 export function getApiBaseUrl() {
-  const env = import.meta?.env;
-  const base = env?.VITE_API_BASE_URL ?? defaultBase;
-  return base || defaultBase;
+  const env = import.meta?.env || {};
+  if (env.DEV) {
+    // Use relative path in dev so fetch('/api/...') hits Vite proxy.
+    return "";
+  }
+  // Production: use configured base if present, else same-origin.
+  const base = env.VITE_API_BASE_URL;
+  return (base && String(base).trim()) || defaultOrigin || "";
 }
 
 /**
@@ -99,12 +106,19 @@ export async function getEventHeatmap(range = "7d") {
 /**
  * PUBLIC_INTERFACE
  * getSocketUrl
- * Resolves the Socket.io server URL from env or falls back to same origin.
+ * Resolves the Socket.io connection URL:
+ * - Development: return '' so client connects to same origin with relative path
+ *   and Vite proxy handles '/socket.io'.
+ * - Production: use VITE_SOCKET_URL when set; otherwise same-origin.
  */
 export function getSocketUrl() {
-  const env = import.meta?.env;
-  const base = env?.VITE_SOCKET_URL ?? defaultSocket;
-  return base || defaultSocket;
+  const env = import.meta?.env || {};
+  if (env.DEV) {
+    // Relative URL in dev so io('', { path:'/socket.io' }) -> same host:port as Vite.
+    return "";
+  }
+  const configured = env.VITE_SOCKET_URL;
+  return (configured && String(configured).trim()) || defaultOrigin || "";
 }
 
 /**

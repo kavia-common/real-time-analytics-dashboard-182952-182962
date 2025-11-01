@@ -73,7 +73,7 @@ export async function adminAuthFetch(path, options = {}) {
    * Wrapper around fetch that attaches Authorization: Bearer <adminToken> when available.
    * Uses same-origin or VITE_API_BASE_URL.
    */
-  const base = getApiBaseUrl();
+  const base = getApiBaseUrl(); // In dev this is '', producing relative '/api/...'
   const url = path.startsWith("http") ? path : `${base}${path}`;
   const token = getAdminToken();
 
