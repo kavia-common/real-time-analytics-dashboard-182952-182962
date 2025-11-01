@@ -2,7 +2,7 @@
 // API utilities for REST and Socket configuration
 //
 
-/* eslint-disable no-console */
+
 
 // Same-origin sentinel for building URLs when no env is provided
 const SAME_ORIGIN = "";
@@ -28,8 +28,8 @@ export function getApiBaseUrl() {
   // Build-time/runtime guard: warn in production if BACKEND_URL missing.
   try {
     const isProd = env?.PROD === true || env?.MODE === "production";
-    if (isProd && !env?.VITE_BACKEND_URL && typeof console !== "undefined") {
-      console.warn(
+    if (isProd && !env?.VITE_BACKEND_URL && typeof globalThis !== "undefined" && globalThis.console) {
+      globalThis.console.warn(
         "[config] VITE_BACKEND_URL is not set in production; frontend will use same-origin for REST calls. Set VITE_BACKEND_URL to your backend URL."
       );
     }
@@ -170,7 +170,7 @@ export async function createEvent(payload) {
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    if (typeof console !== "undefined") console.warn("createEvent failed status:", res.status);
+    if (typeof globalThis !== "undefined" && globalThis.console) globalThis.console.warn("createEvent failed status:", res.status);
     throw new Error(`createEvent failed: ${res.status}`);
   }
   return res.json();
